@@ -1,0 +1,688 @@
+---
+title: "In-stream PIT-tag Detection Systems Modeling"
+#subtitle: "an ETIS webinar"
+author: "Ryan N. Kinzer"
+institute: "Nez Perce Tribe <br/> Department of Fisheries Resources Management <br/> Research Division"
+date: "18th November 2021"
+output:
+  xaringan::moon_reader:
+    css: [default, default-fonts, "ninjutsu", "css/my-theme.css"]
+    seal: false
+    nature:
+      titleSlideClass: ["left", "middle"]
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+      #ratio: '16:9'
+   # css: [default, default-fonts, css/my-theme.css]
+---
+
+```{r load-pkgs, echo=FALSE, message=FALSE}
+library(tidyverse)
+library(PITcleanr)
+
+proj_path <- '../../Collaborative Projects/SnakeBasinFishStatus/'
+```
+
+class: title-slide
+
+<div id="titlebox">
+  <hr style="height:2px;border-width:0;color:#000063;background-color:#000063">
+  <hr style="height:2px;border-width:0;color:#000063;background-color:#000063">
+  <p>.bold[Abundance modeling using in-stream PIT-tag detection systems]</p>
+</div>
+
+<div id="authorbox">
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+
+  Ryan N. Kinzer
+    <a href="mailto: ryank@nezperce.org" class="fa fa-paper-plane"></a>
+    <a href="http://github.com/ryankinzer" class="fa fa-github"></a>
+   <!-- <a href="http://twitter.com/kinzer_ryan" class="fa fa-twitter"></a> -->
+  </br>
+  Nez Perce Tribe <br/>
+  Department of Fisheries Resources Management <br/>
+  Research Division <a href="https://nptfisheries.shinyapps.io/kus-data/" class="fa fa-link"></a>
+  </br>
+</div>
+
+<div id="datebox">
+  <p>IPTDS Subcommittee Meeting</p>
+  <p> 25 May 2023 </p>
+</div>
+
+
+???
+modeling at a large scale
+techniques may not be necessary for small studies
+focus on Snake River basin
+
+---
+
+background-image: url('figures/NPTlogos2.png'), url('figures/IPTDS_pkgs.png')
+background-position: top 5% right 5%, top 50% right 10%
+background-size: 10%, 30%
+
+# Today's Topics
+
+Data Collection, Processing And Analysis
+
+  * PITcleanR: <p>https://github.com/kevinsee/PITcleanr/</p>
+  * STADEM: <p>https://github.com/kevinsee/STADEM/</p>
+  * DABOM: <p>https://github.com/kevinsee/DABOM/</p>
+
+--
+
+</br>
+</br>
+.center[ 
+<em>Packages used today forked from [Kevin See](https://github.com/kevinsee/), WDFW</em>
+]
+
+
+???
+Notes...
+
+* Identify Current Problems and Potential Solutions
+  * Case Studies
+  * Operational Data: Timer Tag, Temperatures, Battery Levels
+
+
+1. DABOM Output
+2. Data file source::
+  1. PTAGIS
+  2. DART
+2. Cleaning/Processing
+4. Summarize
+  PITTrackR
+  IPTDS
+4. Analyze
+5. Results
+
+---
+
+class: mainslide
+background-image: url('figures/NPTlogos2.png')
+background-position: top 5% right 5%
+background-size: 10%
+layout: true
+
+---
+
+# Abundance Estimation
+
+.pull-left[
+.navy[
+Data Collection
+  * LGR Window Observations
+  * LGR Trap; Representative Sampling
+    * PIT-tagging
+    * Genetic Sampling
+    * Scale Sampling
+  ]
+
+.grey[    
+Data Analysis
+  * STADEM - LGR Abundance
+  * PitCleanR - Data Processing
+  * DABOM - IPTDS Abundance
+  ]
+]
+  
+.pull-right[
+  <img class = "displayed" src = 'figures/lower_granite.jpg' width = 80%/>
+  <img class = "displayed" src = 'figures/lgr_trap.jpg' width = 80%/>
+]
+
+---
+background-image: url('figures/model_framework.png')
+background-position: top 50% right 5%
+background-size: 50%
+
+# Abundance Estimation
+
+.pull-left[
+.grey[
+Data Collection
+  * LGR Window Observations
+  * LGR Trap; Representative Sampling
+    * PIT-tagging
+    * Genetic Sampling
+    * Scale Sampling
+  ]
+
+.navy[    
+Data Analysis
+  * STADEM - LGR Abundance
+  * PitCleanR - Data Processing
+  * DABOM - IPTDS Abundance
+  ]
+]
+
+---
+class: inverse, middle, center
+
+<p style="font-size:48px; color:rgb(249, 38, 114);">What's the problem?</p>
+
+---
+
+class: mainslide
+background-image: url('figures/NPTlogos2.png')
+background-position: top 5% right 5%
+background-size: 10%
+layout: true
+
+---
+
+# Too many sites...
+
+.center[
+<img class = "displayed" src = 'figures/site_map.png' width = 80%/>
+]
+
+---
+
+# Too much data...
+
+```{r complete-tag-history, message=FALSE}
+yr <- 2022
+ptagis_file <- paste0(proj_path,'data//CompleteTagHistories/LGR_Steelhead_',yr,'.csv') #<<
+observations = readCTH(ptagis_file)
+
+n_distinct(observations$tag_code) # unique tag codes
+
+n_distinct(observations$event_site_code_value) # unique event sites
+
+dim(observations)[1] # total observations
+
+```
+
+---
+
+# Too much data...
+
+```{r site-obs, message=FALSE}
+site_obs <- observations |>
+  group_by(tag_code, event_site_code_value) |>
+  summarise(n_obs = n()) |>
+  arrange(-n_obs)
+```
+
+.tiny[
+```{r obs-table, echo=FALSE, message=FALSE}
+DT::datatable(head(site_obs, n=100), 
+              filter = 'top',
+                  options = list(
+                    scrollX = TRUE,
+      scrollY = 300,
+      paging = FALSE))
+```
+]
+
+---
+class: inverse, middle, center
+
+<p style="font-size:48px; color:rgb(249, 38, 114);">What did we do?</p>
+
+
+---
+
+background-image: url('figures/NPTlogos2.png'), url('figures/Rlogo.png')
+background-position: top 5% right 5%, top 5% left 5%
+background-size: 10%, 10%
+
+# &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Package
+
+Objectives:
+* Efficiently summarize observations according to desired site layout.
+* Prepare data for DABOM analysis and abundance estimation.
+
+```{r pitcleanr-funs, message=FALSE, eval=FALSE}
+buildConfig() # get PTAGIS sites and establishes 'nodes'
+compress() # compresses into single row with min/max obs time
+addDirection() # upstream/downstream
+filterDetections() # processes obs into pathways
+```
+
+
+.pull-right[
+<img class = "displayed" src = 'figures/PITcleanr.png' width=50%>
+]
+
+
+---
+
+background-image: url('figures/NPTlogos2.png'), url('figures/PITcleanr.png')
+background-position: top 5% right 5%, top 5% left 35%
+background-size: 10%, 10%
+layout: true
+
+---
+
+# PITcleanR
+```{r config-files, echo=FALSE, message=FALSE}
+source('../../Collaborative Projects/SR_Steelhead/R/identifyFishType.R')
+load(paste0(proj_path,'data/ConfigurationFiles/site_config_BON.rda'))
+```
+
+
+```{r build-config, message=FALSE, eval=FALSE}
+configuration <- buildConfig() #<<
+```
+
+
+.tiny[
+```{r config-table, echo=FALSE, message=FALSE}
+DT::datatable(head(configuration %>% select(-site_description), n = 100), 
+              filter = 'top',
+                  options = list(
+                    scrollX = TRUE,
+      scrollY = 300,
+      paging = FALSE))
+```
+]
+
+???
+Queries INT and MRR metadata from PTAGIS API
+Assigns Node
+
+
+---
+
+# PITcleanR
+
+```{r compress, message=FALSE, cache=TRUE}
+comp_obs <- compress(ptagis_file, #<<
+                     configuration = configuration,
+                     ignore_event_vs_release = TRUE,
+                     units = 'days')
+# 3DD.003BDA1FD9
+```
+
+
+.tiny[
+```{r comp-obs-table, echo=FALSE, message=FALSE}
+DT::datatable(head(comp_obs, n = 100), 
+              filter = 'top',
+                  options = list(
+                    scrollX = TRUE,
+      scrollY = 300,
+      paging = FALSE))
+      #pageLength = 8,
+      #dom = "ti",
+      #ordering = FALSE
+```
+]
+
+???
+Condenses sequential observation records at desired spatial level; for example 'node'.
+Common PTAGIS query where observations are condensed at a site level.
+
+Filter for tag id.
+
+---
+
+# PITcleanR
+
+```{r truncate, echo=FALSE, message=FALSE, cache=TRUE}
+  start_date <- lubridate::ymd(paste0(yr-1,'0701'))
+
+  comp_obs <- comp_obs %>%
+      # get the first detection of each tag at Lower Granite Dam
+      left_join(comp_obs %>%
+                  filter(node == "GRA",
+                         event_type_name %in% c("Mark", "Recapture")) %>%  #trap observations
+                  filter(min_det >= start_date) %>% # eliminates observations prior to spawn year
+                         group_by(tag_code) %>%
+                         filter(min_det == min(min_det)) %>%
+                                summarise(start_date = min_det,
+                                          .groups = "drop"),
+                by = "tag_code") %>%
+        filter(min_det >= start_date) %>%
+        group_by(tag_code) %>%
+        mutate(slot = 1:n()) %>%
+        filter(!(node == 'GRA' & slot == 2 & event_type_name == 'Observation')) %>% # removes the subsequent detection in GRA ladder directly after release at trap (can't remove all b/c of reascension)
+        group_by(tag_code) %>%
+        # re-calculate the "slots" for each tag_code
+        mutate(slot = 1:n())
+```
+
+```{r add-direction, message=FALSE, cache=TRUE}
+obs_direct <- comp_obs %>%
+        addDirection(parent_child = pc_nodes) #<< 
+# need parent-child table
+```
+.tiny[
+```{r clean-obs-table, echo=FALSE, message=FALSE}
+obs_direct <- obs_direct %>%
+  ungroup() %>%
+  mutate(id = 1:n()) %>%
+  select(id, everything())
+
+DT::datatable(head(obs_direct, n = 100), 
+              filter = 'top',
+                  options = list(
+                    scrollX = TRUE,
+      scrollY = 300,
+      paging = FALSE))
+```
+]
+
+???
+add desired movement pathways and direction
+
+---
+
+# PITcleanR
+
+```{r life-history, message=FALSE, cache=TRUE}
+obs_direct <- steelhead_lifestage(obs_direct, spawn_year = yr, max_spawn_month = 3) %>%
+    select(id, tag_code, life_stage, everything()) 
+# Not part of PITcleanR #<<
+# 3DD.003D4935A3 - HYC
+# 3DD.003D493774 - BON
+```
+
+.tiny[
+```{r life-obs-table, echo=FALSE, message=FALSE}
+DT::datatable(head(obs_direct, n = 200), 
+              filter = 'top',
+                  options = list(
+                    scrollX = TRUE,
+      scrollY = 300,
+      paging = FALSE))
+```
+]
+
+???
+
+
+---
+
+# PITcleanR
+
+```{r spawner-obs, message=FALSE, cache=TRUE}
+spawner_obs <- obs_direct %>%
+    filter(life_stage == 'spawner') %>%
+    filterDetections(parent_child = NULL, max_obs_date = NULL) %>% #<<
+    select(tag_code, auto_keep_obs, user_keep_obs,
+         site_code, node, direction, everything())
+#	3DD.003D82AF75 WR2/MR1
+# 3DD.003D82AF7F GRS/LTR
+# 3DD.003D82B0FA Walla Walla
+# 3DD.003D82B139 Umatilla
+```
+
+
+.tiny[
+```{r spawner-obs-table, echo=FALSE, message=FALSE}
+DT::datatable(head(spawner_obs, n = 1000),
+              #filter='top',
+              options = list(
+                scrollX = TRUE,
+                scrollY = 250,
+                paging = FALSE
+              ))
+```
+]
+
+???
+filter for spawners only
+process for DABOM model, which only allows a fish to be in a single pathway
+
+---
+
+background-image: url('figures/model_framework.png'), url('figures/NPTlogos2.png'), url('figures/DABOM.png'), url('figures/STADEM.png')
+background-position: center center, top 5% right 5%, top 30% left 5%, bottom 10% right 5%
+background-size: 70%, 10%, 10%, 10%
+
+# IPTDS Model Overview
+
+---
+
+background-image: url('figures/model_framework2.png'), url('figures/NPTlogos2.png'), url('figures/DABOM.png'), url('figures/STADEM.png')
+background-position: center center, top 5% right 5%, top 30% left 5%, bottom 10% right 5%
+background-size: 70%, 10%, 10%, 10%
+
+# IPTDS Model Overview
+
+---
+
+background-image: url('figures/NPTlogos2.png'), url('figures/model_framework.png'), url('figures/DABOM.png')
+background-position: top 5% right 5%, top 50% right 10%, bottom 5% left 5%
+background-size: 10%, 35%, 10%
+
+# DABOM Details
+
+**Detection Process**
+
+* Likelihood:
+$tag^{obs}_{i,node} \sim Bernoulli(p_{node} *  z_{i,j})$
+
+where $z_{i,j}$ is the state of tag $i$ in stream $j$
+
+* Prior:
+$p_{node} \sim Beta(1,1)$ or $p_{node} = 1.0$
+
+**Transition Process**
+
+* Likelihood:
+$z_{i,j} \sim Multinomial(\Psi)$,
+
+where $\Psi = [\psi_1, \psi_2, ... \psi_j]$, and
+
+$j$ = # streams
+
+* Prior:
+$\Psi \sim Dirichlet(1_1, 1_2, ..., 1_j)$
+
+--
+
+.center[
+**Abundance:** $\hat{N_{j}} = \hat{N_{LGD}} * \hat{\psi_j}$
+]
+
+--
+
+.center[
+**Life History:** = $\hat{N_{j,k}} = \hat{N_{j}} *\hat{\rho_k}$
+]
+
+???
+
+What does this mean for abundance at locations with p_node = 1.0?
+
+Weekly time step, with a random walk connection between weeks.
+
+---
+
+background-image: url('figures/NPTlogos2.png'), url('figures/DABOM.png')
+background-position: top 5% right 5%, bottom 5% left 5%
+background-size: 10%, 10%
+layout: true
+
+---
+
+background-image: url('figures/NPTlogos2.png'), url('figures/DABOM.png'), url('figures/PITcleanR.png')
+background-position: top 5% right 5%, bottom 5% left 5%, bottom 5% right 5%
+background-size: 10%, 10%, 10%
+
+# DABOM Model Structure
+
+.center[
+<img class = "displayed" src = 'figures/node_network_BON.png' width = 120%/>
+]
+
+---
+
+class: middle, center, inverse
+layout: false
+
+# Model Outputs
+
+---
+
+class: mainslide
+background-image: url('figures/NPTlogos2.png'), url('figures/STADEM.png')
+background-position: top 5% right 5%, top 30% left 5%
+background-size: 10%, 10%
+layout: true
+
+---
+
+## LGR Abundance
+
+.center[
+<img class = "displayed" src = 'figures/LGR_unique_abundSteelhead.png' width = 80%/>
+]
+
+---
+
+## LGR Abundance - Weekly
+
+.center[
+<img class = "displayed" src = 'figures/LGR_win_abund_21_Steelhead.png' width = 80%/>
+]
+
+---
+
+class: mainslide
+background-image: url('figures/NPTlogos2.png'), url('figures/DABOM.png')
+background-position: top 5% right 5%, top 30% left 5%
+background-size: 10%, 10%
+layout: true
+
+---
+
+## Detection Probabilities
+
+.center[
+<img class = "displayed" src = 'figures/DetectProp_Steelhead.png' width = 60%/>
+]
+
+??
+Not overly precise
+Estimating the probability of detection for fish seen and not seen.
+State space process at work.
+Marsh Creek - MARB0 - 2, MARA0 - 3
+
+---
+
+## Transition Probabilities
+
+.center[
+<img class = "displayed" src = 'figures/transition_probs.png' width = 80%/>
+]
+
+???
+Weeks correspond with the same weeks of the LGR abundance estimates.
+
+---
+
+## Population Abundance
+
+.center[
+<img class = "displayed" src = 'figures/PopAbund_MGP_Steelhead.png' width = 60%/>
+]
+
+?? Abundance is then the product of transition probs. and lgr abundance.
+
+
+---
+
+class: middle, center, inverse
+layout: false
+
+<p style="font-size:24px; color:rgb(249, 38, 114);">IPTDS Extras and Life History</p>
+
+---
+
+class: mainslide
+background-image: url('figures/NPTlogos2.png')
+background-position: top 5% right 5%
+background-size: 10%
+layout: true
+
+---
+
+
+## LGR Run-timing
+.center[
+<img class = "displayed" src = 'figures/LGR_run_timingSteelhead.png' width = 55%/>
+]
+
+---
+
+## Travel time
+.center[
+<img class = "displayed" src = 'figures/travel_time_Steelhead.png' width = 55%/>
+]
+
+
+---
+
+## Female Proportion
+.center[
+<img class = "displayed" src = 'figures/SexProp2Steelhead.png' width = 100%/>
+]
+
+---
+
+## Age Composition
+.center[
+<img class = "displayed" src = 'figures/AgePropEst_Steelhead.png' width = 75%/>
+]
+
+---
+
+# Productivity
+
+.center[
+<img class = "displayed" src = 'figures/lambda_Steelhead.png' width = 70%/>
+]
+
+---
+
+# Productivity
+
+.center[
+<img class = "displayed" src = 'figures/stock_recruit_Steelhead.png' width = 75%/>
+]
+
+---
+
+# Future Direction
+
+* Estimate hatchery-origin abundance
+
+$$\frac{n^{LGD}_{PBT}}{N^{LGD}_{PBT}} = \frac{n^{pop}_{PBT}}{N^{pop}_{PBT}}$$
+
+
+* Constructing the below Lower Granite node network
+  * Estimate overshoot/fallback fish
+  * Estimate survival and abundance of kelting/repeat spawners
+
+---
+  
+## Future Direction - Kelting Rates  
+  
+.center[
+<img class = "displayed" src = 'figures/kelting_rate_pop.png' width = 95%/>
+]
+
+---
+
+## Future Direction - Kelt Survival
+
+.center[
+<img class = "displayed" src = 'figures/kelting_survival_lgd.png' width = 95%/>
+]
+
+---
+
+# Thank you.
+
+.center[
+<img class = "displayed" src = 'figures/partner_logos.png' width = 100%/>
+]
