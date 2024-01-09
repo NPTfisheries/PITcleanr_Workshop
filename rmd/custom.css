@@ -1,0 +1,10 @@
+a, a > code {
+  color: #58ACFA;
+}
+
+.remark-slide-content:not(.title-slide){
+  background-image: 'Images/BiomarkLogo.png';
+  background-position: 9% 15%;
+  background-size: 55px;
+  padding-left: 100px;  /* delete this for 4:3 aspect ratio */
+}
