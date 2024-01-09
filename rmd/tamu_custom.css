@@ -61,6 +61,11 @@ table {
   border-bottom: 1px solid #666;
 }
 
+.xlarge{
+  font-size: 200%;
+}
+
+
 .large{
   font-size: 130%;
 }
@@ -71,4 +76,11 @@ table {
 
 .tiny{
   font-size: 60%;
+}
+
+.bold-italic{
+  font-weight: bold;
+  font-style: italic;
+  font-size: 3em;
+  color: yellow;
 }

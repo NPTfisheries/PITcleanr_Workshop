@@ -470,7 +470,9 @@ parent_child |>
 
 ???
 Fairly simple example
+
 Easy enough to enter by hand directly into R, or type up in Excel
+
 Can get much more complicated
 
 ---
@@ -668,12 +670,15 @@ plotNodes(parent_child,
 ```
 
 ```{r, echo = F}
-comp_dir |> 
+examp_tag <-
+  comp_dir |> 
   filter(direction %in% "unknown") |> 
   slice(1) |> 
-  select(tag_code) |> 
-  left_join(comp_dir,
-            by = join_by(tag_code)) |> 
+  pull(tag_code) |> 
+  unique()
+
+comp_dir |> 
+  filter(tag_code %in% examp_tag) |> 
   select(tag_code,
          node,
          min_det,
@@ -681,7 +686,6 @@ comp_dir |>
          path,
          direction)
 ```
-
 
 ---
 
@@ -693,41 +697,70 @@ comp_filter <- filterDetections(compress_obs = comp_obs,
                                 max_obs_date = "20180930")
 
 comp_filter |> 
+  filter(tag_code %in% examp_tag) |> 
   select(tag_code, node, min_det, direction,
+         path,
          ends_with("keep_obs"))
 ```
 
+???
+`auto_keep_obs` are the default options
+
+user can overwrite with user_keep_obs
+
+---
+
+# Array Efficiency
+
+Based on tags detected at an array, and any tags detected upstream of that array
+
+Start by building a description of how each node is connected to others
+
 ```{r}
-comp_filter |> 
-  filter(is.na(user_keep_obs)) |> 
-  select(tag_code) |> 
-  distinct() |> 
-  slice(1) |> 
-  left_join(comp_filter |> 
-              select(tag_code, 
-                     node, 
-                     min_det, 
-                     direction,
-                     ends_with("keep_obs")),
-            by = join_by(tag_code))
+node_order <-
+  buildNodeOrder(parent_child)
+
+node_order
 ```
 
 
 ---
 
+# Array Efficiency
+
+Based on tags detected at an array, and any tags detected upstream of that array
+
+```{r}
+estNodeEff(comp_filter,
+           node_order)
+```
+
+---
+
 # Capture Histories
 
+May need matrix of 1s and 0s
+
+--
+
+.pull-left[
 ```{r}
 buildCapHist(comp_filter,
              parent_child = parent_child,
              configuration = my_config)
 ```
+]
+--
+
+.pull-right[
+
+*What do columns stand for?*
 
 ```{r}
 defineCapHistCols(parent_child = parent_child,
                   configuration = my_config)
 ```
-
+]
 
 
 ---
@@ -741,3 +774,43 @@ class: inverse, center, middle
 # Package Website
 
 * https://kevinsee.github.io/PITcleanr/
+
+<center>
+```{r, echo = F, out.width='75%'}
+include_graphics('images/website_screenshot.png', dpi = NA)
+```
+</center>
+
+
+---
+
+# Package Website
+
+* https://kevinsee.github.io/PITcleanr/
+
+<center>
+```{r, echo = F, out.width='75%'}
+include_graphics('images/vignettes_screenshot.png', dpi = NA)
+```
+</center>
+
+---
+
+# Contact Developers
+
+* **Kevin See**: Kevin.See@dfw.wa.gov
+
+* **Mike Ackerman**: MikeA@nezperce.org
+
+* **Ryan Kinzer**: RyanK@nezperce.org
+
+---
+
+class: center, middle
+
+background-image: url(images/sunrise.jpg)
+background-size: cover
+
+.bold-italic[
+Questions?
+]
