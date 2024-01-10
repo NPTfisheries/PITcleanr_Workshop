@@ -710,6 +710,13 @@ user can overwrite with user_keep_obs
 
 ---
 
+class: inverse, center, middle
+
+# Other Functionality
+
+
+---
+
 # Array Efficiency
 
 Based on tags detected at an array, and any tags detected upstream of that array
@@ -730,9 +737,23 @@ node_order
 
 Based on tags detected at an array, and any tags detected upstream of that array
 
-```{r}
-estNodeEff(comp_filter,
+```{r eval = F}
+estNodeEff(comp_obs,
            node_order)
+```
+
+
+```{r echo = F}
+estNodeEff(comp_obs,
+           node_order) |> 
+  mutate(across(starts_with("eff_"),
+                ~ round(., digits = 3))) |> 
+  arrange(eff_est) |> 
+  DT::datatable(filter = 'top',
+                options = list(
+                  scrollX = TRUE,
+                  scrollY = 250,
+                  paging = FALSE))
 ```
 
 ---
