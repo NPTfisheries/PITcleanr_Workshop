@@ -721,6 +721,8 @@ class: inverse, center, middle
 
 Based on tags detected at an array, and any tags detected upstream of that array
 
+--
+
 Start by building a description of how each node is connected to others
 
 ```{r}
@@ -760,11 +762,10 @@ estNodeEff(comp_obs,
 
 # Capture Histories
 
-May need matrix of 1s and 0s
-
---
-
 .pull-left[
+
+### May need matrix of 1s and 0s
+
 ```{r}
 buildCapHist(comp_filter,
              parent_child = parent_child,
@@ -779,7 +780,8 @@ buildCapHist(comp_filter,
 
 ```{r}
 defineCapHistCols(parent_child = parent_child,
-                  configuration = my_config)
+                  configuration = my_config) |> 
+  as_tibble()
 ```
 ]
 
