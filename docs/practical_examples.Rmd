@@ -1,0 +1,322 @@
+---
+title: "PITcleanr: Practical Examples"
+author:
+  - Ryan N. Kinzer
+  - Mike Ackerman
+  - Kevin See
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  rmarkdown::html_vignette:
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Querying, Compressing, and Making Sense of PIT Tag Detection Data}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE, results = "hide"}
+# knitr options
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  echo = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
+)
+
+library(knitr)
+library(here)
+library(kableExtra)
+
+api_key = '1AA5CF55-C98E-4001-96E4-1E96CEE1E806'
+```
+
+
+# Load Packages
+
+```{r load-package}
+library(PITcleanr)
+library(tidyverse)
+```
+
+# Query Data
+
+## PTAGIS Site Information
+```{r int-meta}
+# interrogation site meta data
+int_meta <- queryInterrogationMeta(site_code = NULL) # could specify single site
+
+# count in-stream remote sites
+int_meta %>%
+  filter(siteType == "Instream Remote Detection System",
+         active) %>%
+  count(operationsOrganizationCode) %>%
+  ggplot(aes(x = operationsOrganizationCode, y = n)) +
+    geom_col() + 
+    coord_flip()
+```
+```{r int-map}
+# plot location of interrogation sites
+
+library(maps)
+pnw = st_as_sf(map("state", region = c('ID', 'WA', 'OR'), plot = FALSE, fill = TRUE)) # get state boundaries
+
+int_sf <- int_meta %>% # create spatial feature object of IPTDS
+  filter(siteType == "Instream Remote Detection System",
+         !is.na(longitude),
+         !is.na(latitude)) %>%
+  st_as_sf(coords = c('longitude', 'latitude'), 
+           crs = 4326)
+
+ggplot() + 
+  geom_sf(data = pnw) + 
+  geom_sf(data = int_sf, aes(color = active))
+```
+
+
+```{r int-cofig}
+# configuration of Interrogation site
+int_config <- queryInterrogationConfig(site_code = 'ZEN')
+
+int_config %>%
+  kable() %>%
+  kable_styling(full_width = TRUE,
+                bootstrap_options = 'striped')
+```
+
+
+```{r mrr-meta}
+# a similar function exists for MRR sites
+mrr_meta <- queryMRRMeta(site = NULL)
+
+# wrapper to download all site information
+ptagis_meta <- queryPtagisMeta()
+
+# wrapper to download meta and configuration data at once, and then apply formatting
+config <- buildConfig()
+```
+
+## PTAGIS Tag Data
+```{r test-tag, eval = FALSE, echo = FALSE}
+# not working, requires janitor, throws other errors
+# Check for timer tags and site operation
+test_tags <- tmp_queryTestTagSite(site_code = "ZEN", year = 2023, api_key) # need API key
+
+test_tags %>%
+  group_by(antenna_id, time_stamp, tag_code) %>%
+  count() %>%
+  ggplot(aes(x = time_stamp, y = n, colour = tag_code)) +
+  geom_point() +
+  facet_wrap(~antenna_id)
+
+```
+```{r tag-meta}
+# not working
+queryTagMeta("3D9.1C2D929849") # not exported
+```
+
+```{r complete-tag-history-site}
+# download a PTAGIS complete tag history for a single tag code
+tagID <- "3D6.1D594D4AFA" # IR3, GOJ, BO1 -> IR5
+tagID <- "3DD.003D494091" # GRA, IR1 -> IML
+
+cth_site <- queryCapHist(ptagis_tag_code = tagID)
+
+cth_site %>%
+  group_by(event_type_name, event_site_code_value) %>%
+  summarise(n_dets = n(),
+            min_det = min(event_date_time_value),
+            max_det = max(event_date_time_value)) %>%
+  mutate(duration = difftime(max_det, min_det, units = "hours")) %>%
+  kable() %>%
+  kable_styling(full_width = TRUE,
+            bootstrap_options = 'striped') 
+```
+
+```{r complete-tag-history-node, eval = FALSE, echo = FALSE}
+# doesn't work - nothing is different from when config is not supplied
+cth_node <- queryCapHist(ptagis_tag_code = tagID,
+                         config = config,
+                         include_mark = TRUE,
+                         api_key = api_key)
+
+glimpse(cth_node) %>%
+  kable()
+```
+
+
+```{r MRR-single-file}
+# MRR tag file summaries
+mrr_file <- "NBD15065.TUM"
+mrr_file <- "JSW-2022-175-001.xml"
+
+mrr_data <- queryMRRDataFile(mrr_file)
+
+mrr_data %>%
+  filter(event_type == 'Mark') %>%
+  group_by(event_date, species_run_rear_type) %>%
+  count() %>%
+  ggplot(aes(x = event_date, y = n, fill = species_run_rear_type)) +
+  geom_col() +
+  labs(title = paste0(unique(mrr_data$release_site), ' : ', mrr_file))
+
+```
+```{r MRR-LGRLDR}
+# LGRLDR tag file summaries
+mrr_file <- "JSW-2022-175-001.xml"
+
+mrr_data <- queryMRRDataFile(mrr_file)
+
+mrr_data %>%
+  group_by(species_run_rear_type, text_comments) %>%
+  count() %>%
+  ggplot(aes(x = text_comments, y = n, fill = species_run_rear_type)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = paste0(unique(mrr_data$release_site), ' : ', mrr_file))
+
+```
+
+
+```{r MRR-multiple-files}
+# iterate across multiple MRR tag files
+julian <- str_pad(1:10,3,pad = 0) # julian date
+yr <- 2024 # sampling year
+mrr_files <- paste0('IMN-', yr, '-', julian,'-NT1.xml')
+
+mrr_data <- map_df(mrr_files,  # loop across files
+             .f = queryMRRDataFile)
+
+mrr_data %>%
+  filter(event_type == 'Mark') %>%
+  mutate(release_date = date(release_date)) %>%
+  group_by(release_date, species_run_rear_type) %>%
+  count() %>%
+  kable() %>%
+  kable_styling(full_width = TRUE)
+```
+
+
+
+# Load PTAGIS Data
+
+```{r build-filepath}
+# the following code generates a file path to example PTAGIS complete tag history data
+ptagis_file <- system.file("extdata", 
+                          "TUM_chnk_cth_2018.csv",
+                          package = "PITcleanr",
+                          mustWork = TRUE)
+
+# alternatively, you could use your own PTAGIS complete tag history file with the following fields:
+
+# Tag, Mark Species, Mark Rear Type, Event Type, Event Site Type, Event Site Code, Event Date Time, Antenna, Antenna Group Configuration, Event Release Site Code, and Event Release Date Time.
+
+#ptagis_file = "C:/Users/USER_NAME_HERE/Downloads/TUM_chnk_cth_2018.csv"
+```
+
+
+```{r raw-ptagis-data}
+# load the complete tag history data and format the data based on the file_type
+raw_ptagis <- readCTH(ptagis_file, file_type = "PTAGIS") %>%
+    filter(event_date_time_value >= lubridate::ymd(20180301))
+
+# alternatively you could read in the raw file without changes
+#raw_ptagis <- readr::read_csv(ptagis_file)) 
+```
+
+```{r qc-data}
+qc_detections = qcTagHistory(ptagis_file)
+qc_detections
+```
+
+
+```{r tag-counts}
+dplyr::n_distinct(raw_ptagis$tag_code)
+# 
+# mark_only_tags = raw_ptagis %>%
+#   dplyr::select(`Tag Code`, `Event Type Name`) %>%
+#   dplyr::count(`Tag Code`, `Event Type Name`) %>%
+#   tidyr::pivot_wider(names_from = `Event Type Name`,
+#                      values_from = n,
+#                      values_fill = 0) %>%
+#   #mutate(nDetections = rowSums(across(where(is.numeric)))) %>%
+#   dplyr::filter(Observation == 0 & Recapture == 0 & Recovery == 0)
+```
+
+```{r config}
+# the pre-built configuration file
+configuration <- system.file("extdata", 
+                             "TUM_configuration.csv", 
+                             package = "PITcleanr",
+                             mustWork = TRUE) |> 
+  read_csv(show_col_types = F)
+
+# the pre-built parent-child table
+parent_child <- system.file("extdata", 
+                            "TUM_parent_child.csv", 
+                            package = "PITcleanr",
+                            mustWork = TRUE) |> 
+  read_csv(show_col_types = F)
+
+
+```
+
+
+```{r plot-parent-child}
+# plot parent child configuration
+plotNodes(parent_child)
+```
+
+
+```{r build-nodes}
+parent_child_nodes <- addParentChildNodes(parent_child, config)
+plotNodes(parent_child_nodes)
+```
+
+```{r build-node-order}
+node_order <- buildNodeOrder(parent_child_nodes)
+```
+
+
+```{r compress-data}
+comp_obs <- compress(raw_ptagis,
+                 configuration = config)
+
+#dim(raw_ptagis) # 13294
+#dim(comp_obs) # 6755
+
+head(comp_obs)
+```
+
+
+```{r add-direction}
+comp_dir <- addDirection(comp_obs, parent_child_nodes, direction = "u")
+```
+
+
+
+```{r filter-detections}
+comp_filter <- filterDetections(comp_obs, parent_child)
+```
+
+```{r auto-keep}
+# after double checking PITcleanr calls filter out the final dataset for further analysis 
+comp_final <- comp_filter %>%
+  filter(auto_keep_obs)
+```
+
+```{r summarise-dets}
+node_tags <- comp_final %>%
+  group_by(node) %>%
+  summarise(n_tags = n_distinct(tag_code))
+```
+
+```{r est-eff}
+node_eff <- estNodeEff(comp_final, node_order = node_order)
+```
+
+```{r plot-est-tags}
+# plot tags on a map
+```
