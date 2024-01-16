@@ -1,5 +1,5 @@
 ---
-title: "PITcleanr: Practical Examples"
+title: "PITcleanr Workshop"
 author:
   - Ryan N. Kinzer
   - Mike Ackerman
@@ -9,7 +9,7 @@ output:
   rmarkdown::html_vignette:
     toc: true
 vignette: >
-  %\VignetteIndexEntry{Querying, Compressing, and Making Sense of PIT Tag Detection Data}
+  %\VignetteIndexEntry{PITcleanr Workshop}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -31,24 +31,53 @@ library(here)
 library(kableExtra)
 
 api_key = '1AA5CF55-C98E-4001-96E4-1E96CEE1E806'
+
+```
+
+
+# Installation
+
+If necessary, the `PITcleanr` package can be installed as an R package from GitHub by using Hadley Wickham's `devtools` package. Additional information on package installation can be found on the [website README](https://github.com/KevinSee/PITcleanr?tab=readme-ov-file#installation-instructions). 
+
+```{r gh-installation, eval = FALSE}
+# install PITcleanr, if necessary
+install.packages("devtools")
+library(devtools)
+remotes::install_github("KevinSee/PITcleanr", 
+                         build_vignettes = TRUE)
+
 ```
 
 
 # Load Packages
 
-```{r load-package}
+Once `PITcleanr` is successfully installed, it can be loaded into the R session. In this workshop, we will also use functions from the following packages. Packages can be loaded using the `library()` function. For any packages not already installed, the `install.packages()` function can be used first.
+
+```{r load-packages}
+# E.g., for packages not installed:
+# install.packages(c("tidyverse", "sf"))
+
+# load necessary packages
 library(PITcleanr)
 library(tidyverse)
+library(sf)
+
 ```
 
 # Query Data
 
 ## PTAGIS Site Information
-```{r int-meta}
-# interrogation site meta data
-int_meta <- queryInterrogationMeta(site_code = NULL) # could specify single site
 
-# count in-stream remote sites
+### Interrogation Sites
+
+`PITcleanr` can be used to query and download metadata for PTAGIS interrogation sites using the function `queryInterrogationMeta()`. The `site_code` argument can be used to specify sites; alternatively, set `site_code` to `NULL` to retrieve metadata for all sites.
+
+```{r int-meta}
+# interrogation site metadata
+int_meta_KRS = queryInterrogationMeta(site_code = "KRS")
+int_meta = queryInterrogationMeta(site_code = NULL)
+
+# count active instream remote sites by organization
 int_meta %>%
   filter(siteType == "Instream Remote Detection System",
          active) %>%
@@ -56,53 +85,77 @@ int_meta %>%
   ggplot(aes(x = operationsOrganizationCode, y = n)) +
     geom_col() + 
     coord_flip()
+
 ```
+
+As an example, we can use the `int_meta` objects to map our interrogation sites using the `sf` package. State polygons are available in the `maps` package.
+
 ```{r int-map}
 # plot location of interrogation sites
-
 library(maps)
-pnw = st_as_sf(map("state", region = c('ID', 'WA', 'OR'), plot = FALSE, fill = TRUE)) # get state boundaries
 
-int_sf <- int_meta %>% # create spatial feature object of IPTDS
+# get state boundaries
+pnw = st_as_sf(map("state", 
+                   region = c('ID', 'WA', 'OR'), 
+                   plot = FALSE, 
+                   fill = TRUE)) # get state boundaries
+
+# create spatial feature object of IPTDS
+int_sf <- int_meta %>% 
   filter(siteType == "Instream Remote Detection System",
          !is.na(longitude),
          !is.na(latitude)) %>%
   st_as_sf(coords = c('longitude', 'latitude'), 
-           crs = 4326)
+           crs = 4326) # WGS84
 
 ggplot() + 
   geom_sf(data = pnw) + 
   geom_sf(data = int_sf, aes(color = active))
+
 ```
 
+`PITcleanr` also includes the function `queryInterrogationConfig()` function to query and download configuration metadata for PTAGIS interrogation sites. The configuration metadata contains information about individual antennas, transceivers, etc., including their arrangement. Similar to above, `site_code` can be set to `NULL` to get configuration metadata for all PTAGIS interrogation sites.
 
-```{r int-cofig}
-# configuration of Interrogation site
+```{r int-config}
+# configuration of an interrogation site
 int_config <- queryInterrogationConfig(site_code = 'ZEN')
 
 int_config %>%
   kable() %>%
   kable_styling(full_width = TRUE,
                 bootstrap_options = 'striped')
+
 ```
 
+### Mark/Recapture/Recovery Sites
+
+A similar function exists to query and download metadata for PTAGIS mark-recapture-recovery (MRR) sites.
 
 ```{r mrr-meta}
-# a similar function exists for MRR sites
+# all MRR sites
 mrr_meta <- queryMRRMeta(site = NULL)
 
-# wrapper to download all site information
+```
+
+### All PTAGIS Sites
+
+`PITcleanr` includes additional functions that can query interrogation and MRR sites together. The `queryPtagisMeta()` function is a wrapper function to download all INT and MRR sites at once. The `buildConfig()` function goes a step further and downloads all INT and MRR site metadata, plus INT site configuration information, and applies some formatting to combine all PTAGIS site metadata.
+
+```{r all-ptagis-sites}
+# wrapper to download all site meta
 ptagis_meta <- queryPtagisMeta()
 
-# wrapper to download meta and configuration data at once, and then apply formatting
+# wrapper to download site metadata and INT configuration data at once, and apply some formatting
 config <- buildConfig()
+
 ```
 
 ## PTAGIS Tag Data
 ```{r test-tag, eval = FALSE, echo = FALSE}
 # not working, requires janitor, throws other errors
 # Check for timer tags and site operation
-test_tags <- tmp_queryTestTagSite(site_code = "ZEN", year = 2023, api_key) # need API key
+#test_tags <- tmp_queryTestTagSite(site_code = "ZEN", year = 2023, api_key) # need API key
+test_tags <- queryTestTagSite(site_code = "ZEN", year = 2023, api_key) # need API key
 
 test_tags %>%
   group_by(antenna_id, time_stamp, tag_code) %>%
@@ -112,9 +165,10 @@ test_tags %>%
   facet_wrap(~antenna_id)
 
 ```
+
 ```{r tag-meta}
 # not working
-queryTagMeta("3D9.1C2D929849") # not exported
+#queryTagMeta("3D9.1C2D929849") # not exported
 ```
 
 ```{r complete-tag-history-site}
