@@ -258,14 +258,6 @@ mrr_data <- queryMRRDataFile(mrr_file)
 # view mrr data file
 mrr_data
 
-# mrr_data %>%
-#   filter(event_type == 'Mark') %>%
-#   group_by(event_date, species_run_rear_type) %>%
-#   count() %>%
-#   ggplot(aes(x = event_date, y = n, fill = species_run_rear_type)) +
-#   geom_col() +
-#   labs(title = paste0(unique(mrr_data$release_site), ' : ', mrr_file))
-
 # summary of injuries
 mrr_data %>%
   group_by(species_run_rear_type, text_comments) %>%
@@ -307,7 +299,7 @@ mrr_data %>%
 The user could combine mark data from `queryMRRDataFile()` and observations after the mark event from `queryCapHist()` into complete tag histories. However, the user may choose to read in a complete tag history that they've previously queried and downloaded from PTAGIS.
 
 
-# PITcleanr Workflow
+# Read Complete Tag Histories
 
 PTAGIS contains a record of each detection of every PIT tag, including the initial detection, or "mark", when the tag is implanted, detections on PIT-tag antennas, recaptures (e.g., at weirs), and recoveries (e.g., carcass surveys). It contains a record of every individual detection, which potentially means multiple records of a tag being detected on the same antenna over and over e.g., in the case that it is not moving. Therefore, querying PTAGIS for all these detections often leands to a wealth of data, which can be unwieldy for the user. `PITcleanr` aims to compress that data to a more manageable size, without losing any of the information contained in the dataset.
 
@@ -329,7 +321,7 @@ tag_list = "C:/Users/username/Desktop/my_tag_list.txt"
 
 ```
 
-## Read Complete Tag History
+## Read PTAGIS CTH
 
 Once the user has created their own tag list, or located this example one, they can go to [PTAGIS](https://www.ptagis.org/) to query the complete tag histories for those tags. Detailed instructions for querying complete tag histories for use in PITcleanr can be found [here](https://kevinsee.github.io/PITcleanr/articles/Prep_PIT_data.html#complete-capture-history). Briefly, the following fields or attributes are required:
 
@@ -395,9 +387,10 @@ qc_detections
 
 ```
 
-## Parent-Child Table
+# Parent-Child Tables
 
 ```{r extract-sites}
+# extract sites from complete tag histories
 sites_sf = extractSites(raw_ptagis,
                         as_sf = T,
                         min_date = "20180501")
@@ -471,10 +464,13 @@ parent_child = buildParentChild(sites_sf,
 
 ```
 
+<!-- There is an errant site plotted when running plotNodes() on the corrected parent-child, which seems to be causing some issues below, as well. -->
+
 ```{r edit-parent-child}
 # plot parent-child table
 plotNodes(parent_child)
 
+# edit parent-child table
 parent_child = editParentChild(parent_child,
                                fix_list = list(c(NA, "PES", "TUM"),
                                                c(NA, "LNF", "ICL"),
@@ -486,44 +482,94 @@ parent_child
 
 ```
 
-```{r add-nodes}
-# expand the parent_child table to include nodes
-parent_child_nodes = addParentChildNodes(parent_child = parent_child,
-                                         configuration = config)
-
-# view expanded parent-child table
-parent_child_nodes
-
-# plot expanded parent-child table
-plotNodes(parent_child_nodes)
-
-```
-
-```{r build-node-order, eval = F, echo = F}
-# having an issue with both of these functions at the moment
-
-node_paths = buildPaths(parent_child = parent_child)
-
-# build path and order to each location
-node_order <- buildNodeOrder(parent_child = parent_child_nodes)
-
-```
 
 # Compress Detections
 
+```{r start-fresh}
+# clear environment
+rm(list = ls())
+
+# the complete tag history from PTAGIS
+ptagis_file <- system.file("extdata", 
+                           "TUM_chnk_cth_2018.csv", 
+                           package = "PITcleanr",
+                           mustWork = TRUE)
+
+# read complete tag histories into R
+cth_df = readCTH(ptagis_file,
+                 file_type = "PTAGIS") %>%
+  # filter detections before start of run year
+  filter(event_date_time_value >= lubridate::ymd(20180301))
+
+# the pre-built configuration file
+configuration = system.file("extdata",
+                            "TUM_configuration.csv",
+                            package = "PITcleanr",
+                            mustWork = TRUE) %>%
+  read_csv(show_col_type = F)
+
+# the pre-built parent-child table
+parent_child = system.file("extdata", 
+                           "TUM_parent_child.csv", 
+                           package = "PITcleanr",
+                           mustWork = TRUE) %>% 
+  read_csv(show_col_types = F)
+
+```
+
 ```{r compress}
 # compress observations
-comp_obs = compress(raw_ptagis,
-                    configuration = config)
+comp_obs = compress(cth_df,
+                    configuration = configuration)
 
 # view compressed observations
 head(comp_obs)
 
 # compare number of directions
-nrow(raw_ptagis)
+nrow(cth_df)
 nrow(comp_obs)
 
 ```
+
+```{r plot-pc}
+# plot new parent-child table
+plotNodes(parent_child)
+
+```
+
+## Add Nodes (Arrays)
+
+```{r add-nodes}
+# add nodes for arrays
+parent_child_nodes = addParentChildNodes(parent_child = parent_child,
+                                        configuration = configuration)
+
+# plot parent-child w/ nodes
+plotNodes(parent_child_nodes)
+
+```
+
+## Movement Paths & Node Order
+
+```{r build-paths}
+# build paths to nodes
+node_paths = buildPaths(parent_child = parent_child_nodes)
+
+# view paths to nodes
+node_paths
+
+```
+
+```{r node-order}
+# build paths and add node order
+node_order = buildNodeOrder(parent_child = parent_child_nodes)
+
+# view node paths and orders
+node_order
+
+```
+
+## Add Direction
 
 ```{r add-direction}
 # add direction based on parent-child table
@@ -533,12 +579,15 @@ comp_dir <- addDirection(compress_obs = comp_obs,
 
 ```
 
+## Filtering Detections
+
 ```{r filter-detections}
 # add direction, and filter detections
 comp_filter = filterDetections(compress_obs = comp_obs, 
                                parent_child = parent_child_nodes,
                                max_obs_date = "20180930")
 
+# view filtered observations
 comp_filter %>%
   select(tag_code:min_det, 
          direction,
@@ -552,40 +601,52 @@ comp_filter %>%
 ```
 
 ```{r auto-keep}
-# after double checking PITcleanr calls filter out the final dataset for further analysis 
-comp_final <- comp_filter %>%
-  filter(auto_keep_obs)
+# after double-checking PITcleanr calls, filter out the final dataset for further analysis
+comp_final = comp_filter %>%
+  filter(auto_keep_obs = TRUE)
+
 ```
 
 ```{r summarise-dets}
-node_tags <- comp_final %>%
+# number of unique tags per node
+node_tags = comp_final %>%
   group_by(node) %>%
   summarise(n_tags = n_distinct(tag_code))
+
+# view tags per node
+node_tags
+
 ```
+
+```{r plot-est-tags, eval = F, echo = F}
+# plot tags on a map
+
+```
+
+
+## Detection Efficiencies
 
 ```{r est-eff}
-node_eff <- estNodeEff(comp_final, node_order = node_order)
-```
+# estimate detection efficiencies for nodes
+node_eff = estNodeEff(capHist_proc = comp_final,
+                      node_order = node_order)
 
-```{r plot-est-tags}
-# plot tags on a map
-```
-
-```{r config}
-# the pre-built configuration file
-configuration <- system.file("extdata", 
-                             "TUM_configuration.csv", 
-                             package = "PITcleanr",
-                             mustWork = TRUE) |> 
-  read_csv(show_col_types = F)
-
-# the pre-built parent-child table
-parent_child <- system.file("extdata", 
-                            "TUM_parent_child.csv", 
-                            package = "PITcleanr",
-                            mustWork = TRUE) |> 
-  read_csv(show_col_types = F)
-
+# view node efficiencies
+node_eff
 
 ```
 
+## Capture Histories
+
+```{r cap-hist}
+# build capture histories
+cap_hist = buildCapHist(filter_ch = comp_filter,
+                        parent_child = parent_child,
+                        configuration = configuration)
+
+# view capture histories
+cap_hist
+
+```
+
+# Applications
