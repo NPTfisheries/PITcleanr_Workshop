@@ -184,6 +184,15 @@ observations |>
 
 ---
 
+class: center, middle
+
+```{r snake-map, echo = F, out.width="60%"}
+include_graphics('images/snake_site_map.png', dpi = NA)
+```
+
+
+---
+
 class: inverse, center, middle
 
 # PITcleanr Package
@@ -213,6 +222,8 @@ class: inverse, center, middle
   * Includes tools to build parent-child table
 
 * Estimate array/site efficiency  
+
+* Build capture history matrix
 ]
 
 
@@ -370,7 +381,8 @@ Node could be:
 Can use PTAGIS site metadata to construct
 
 ```{r, cache=T}
-my_config <- buildConfig(node_assign = "site")
+my_config <- 
+  buildConfig(node_assign = "site")   #<<
 ```
 
 ---
@@ -496,7 +508,7 @@ Can get much more complicated
 ```{r, eval = F}
 # extract sites from detection file
 sites_sf <-
-  extractSites(cth_file = cth_df,
+  extractSites(cth_file = cth_df,   #<<
                as_sf = T,
                # drop juvenile detection/marking sites
                min_date = "20180501")
@@ -553,7 +565,7 @@ sites_sf <-
 ```{r, eval = F}
 # query the flowlines
 nhd_list <-
-  queryFlowlines(sites_sf = sites_sf,
+  queryFlowlines(sites_sf = sites_sf,   #<<
                  root_site_code = "TUM",
                  min_strm_order = 2,
                  dwnstrm_sites = T,
@@ -589,13 +601,13 @@ flowlines |>
 ```{r, eval = F}
 parent_child <-
   suppressWarnings(
-    buildParentChild(sites_sf,
+    buildParentChild(sites_sf,   #<<
                      flowlines))
 ```
 
 ```{r, eval = F}
 parent_child <-
-  editParentChild(parent_child,
+  editParentChild(parent_child,   #<<
                   fix_list = 
                     list(c(NA, "PES", "TUM"),
                          c(NA, "LNF", "ICL"),
@@ -624,7 +636,7 @@ parent_child |>
 .pull-left[
 
 ```{r, fig.height = 4}
-plotNodes(parent_child,
+plotNodes(parent_child,   #<<
           point_size = 10,
           label_size = 5)
 ```
@@ -636,7 +648,7 @@ plotNodes(parent_child,
 All possible fish pathways
 
 ```{r}
-buildNodeOrder(parent_child)
+buildNodeOrder(parent_child)   #<<
 ```
 
 ]
@@ -647,7 +659,7 @@ buildNodeOrder(parent_child)
 
 ```{r}
 comp_dir <-
-  addDirection(compress_obs = comp_obs,
+  addDirection(compress_obs = comp_obs,   #<<
                parent_child = parent_child)
 
 comp_dir |> 
@@ -692,9 +704,10 @@ comp_dir |>
 # Filter Observations
 
 ```{r}
-comp_filter <- filterDetections(compress_obs = comp_obs,
-                                parent_child = parent_child,
-                                max_obs_date = "20180930")
+comp_filter <- 
+  filterDetections(compress_obs = comp_obs,   #<<
+                   parent_child = parent_child,
+                   max_obs_date = "20180930")
 
 comp_filter |> 
   filter(tag_code %in% examp_tag) |> 
@@ -740,7 +753,7 @@ node_order
 Based on tags detected at an array, and any tags detected upstream of that array
 
 ```{r eval = F}
-estNodeEff(comp_obs,
+estNodeEff(comp_obs,   #<<
            node_order)
 ```
 
@@ -767,7 +780,7 @@ estNodeEff(comp_obs,
 ### May need matrix of 1s and 0s
 
 ```{r}
-buildCapHist(comp_filter,
+buildCapHist(comp_filter,   #<<
              parent_child = parent_child,
              configuration = my_config)
 ```
@@ -779,7 +792,7 @@ buildCapHist(comp_filter,
 *What do columns stand for?*
 
 ```{r}
-defineCapHistCols(parent_child = parent_child,
+defineCapHistCols(parent_child = parent_child,   #<<
                   configuration = my_config) |> 
   as_tibble()
 ```
@@ -826,6 +839,12 @@ include_graphics('images/vignettes_screenshot.png', dpi = NA)
 * **Mike Ackerman**: MikeA@nezperce.org
 
 * **Ryan Kinzer**: RyanK@nezperce.org
+
+
+--
+
+## Come to workshop this afternoon
+
 
 ---
 

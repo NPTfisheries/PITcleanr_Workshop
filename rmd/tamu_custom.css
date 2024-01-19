@@ -28,10 +28,10 @@ a, a > code {
 }
 
 .title-slide{
-  background-image: url(images/wdfwlogo_clr.png);
-  background-position: left 10px bottom 10px;
-  background-size: 20%;
-  padding-right: 10px;
+  background-image: url(images/wdfwlogo_clr.png), url(images/DFRM.png);
+  background-position: 3% 95%, 97% 95%;
+  background-size: 15%, 10%;
+  padding-right: 10px, 10px;
 }
 
 .title-slide .remark-slide-number{
