@@ -653,3 +653,9 @@ cap_hist
 ```
 
 # Applications
+
+
+```{r build-script, echo = FALSE}
+knitr::purl(input = "C:/Git/PITcleanr_Workshop/docs/practical_examples.Rmd",
+            output = "C:/Git/PITcleanr_Workshop/docs/practical_examples.R")
+```
