@@ -50,6 +50,8 @@ This document serves as a tutorial to the most common functions contained in `PI
 * developing fish pathways, and finally, 
 * an example case study.
 
+Additional information on PITcleanr can be found on its [GitHub page](https://github.com/KevinSee/PITcleanr) or [website](https://kevinsee.github.io/PITcleanr/index.html). Materials from this workshop can be found [here](https://github.com/NPTfisheries/PITcleanr_Workshop).
+
 ## Installation
 
 `PITcleanr` can be installed from GitHub using the R `remotes` package. Additional information on package installation can be found on the `PITcleanr` website [README](https://github.com/KevinSee/PITcleanr).
@@ -75,6 +77,7 @@ library(tidyverse)
 library(sf)
 library(kableExtra)
 ```
+
 
 # Query Site Data
 
@@ -210,6 +213,7 @@ test_tag %>%
         axis.title.y = element_blank()) +
   facet_grid(antenna_id~transceiver_id)
 ```
+
 
 # Compressing Tag Observations
 
@@ -370,7 +374,7 @@ mrr_data %>%
   labs(title = paste0(unique(mrr_data$release_site), ' : ', mrr_file))
 ```
 
-If more than one mark file is desired the user could iterate over `queryMRRDataFile()` to easily query multiple files and combine them into a single data frame or list.
+If more than one mark file is desired the user could iterate over `queryMRRDataFile()` using `purrr::map_df()` to query multiple files and combine them into a single data frame or list.
 
 ```{r MRR-multiple-files}
 julian = str_pad(1:10, 3, pad = 0) # julian 001 - 010
@@ -379,11 +383,12 @@ yr = 2024                          # tagging year
 # Imnaha smolt trap, first 10 days of 2024
 mrr_files = paste0("IMN-", yr, "-", julian, "-NT1.xml")
 
-mrr_data <- map_df(mrr_files,  # loop across files
+# iterate over files
+mrr_data <- map_df(mrr_files,  
              .f = queryMRRDataFile)
 
 # view mrr data
-mrr_data
+head(mrr_data, 5)
 
 # summarise new marks by day
 mrr_data %>% 
@@ -397,13 +402,15 @@ mrr_data %>%
                 bootstrap_options = "striped")
 ```
 
-The mark data from `queryMRRDataFile()` and the observations data from `queryCapHist()` could also be combined to form a complete tag history. However, this process is not recommended for large number of tag codes.
+The mark data from `queryMRRDataFile()` and the observations data from `queryCapHist()` could be combined to form a complete tag history. However, this process is not recommended for large number of tag codes.
 
 ## Compress Detections
 
-After downloading the complete tag history data from PTAGIS and reading the file into the R environment with `readCTH` we are now ready to start summarizing the information. The first step is to `compress` the tag histories into a more manageable format based on the "array" configuration from above step using the function `buildConfg` and the argument `node_assign`.
+After downloading the complete tag history data from PTAGIS and reading the file into the R environment with `readCTH()` we are now ready to start summarizing the information. The first step is to `compress()` the tag histories into a more manageable format based on the "array" configuration from above using the function `buildConfg()` and the arguments `node_assign == "array"` and `array_suffix == "UD"`.
 
-```{r start-fresh, eval=FALSE, echo=FALSE}
+The `compress()` function assigns detections on individual antennas to "nodes" (if no configuration file is provided, nodes are considered site codes), summarizes the first and last detection time on each node, as well as the number of detections that occurred during that "slot". More information on the `compress()` function can be found [here](https://kevinsee.github.io/PITcleanr/reference/compress.html) or using `?PITcleanr::compress`.
+
+```{r start-fresh, eval = FALSE, echo = FALSE}
 ## # clear environment
 ## #rm(list = ls())
 ## 
@@ -436,22 +443,23 @@ After downloading the complete tag history data from PTAGIS and reading the file
 
 ```{r compress}
 # compress observations
-comp_obs = compress(raw_ptagis,
+comp_obs = compress(cth_file = raw_ptagis,
                     configuration = config)
 
 # view compressed observations
 head(comp_obs)
 
-# compare number of directions
+# compare number of detections
 nrow(raw_ptagis)
 nrow(comp_obs)
 ```
 
-The result of `compress` can easily be summarized for unique tags at each node.
+The result of `compress()` can summarized in a variety of ways, including the number of unique tags at each node.
 
 ```{r distinct-tags}
 n_distinct(comp_obs$tag_code)
 
+# number of unique tags per node
 comp_obs %>%
   group_by(node) %>%
   summarise(n = n_distinct(tag_code)) %>%
@@ -460,15 +468,18 @@ comp_obs %>%
   coord_flip()
 ```
 
+Compressing individual antenna detections to a more useful spatial scale and a more manageable size and format is a useful initial step. Further, summaries of compressed detections can answer some questions. However, more meaningful inference from PIT-tag data often requires understanding the relationship of your sites or nodes to one another, to better understand fish movements.
+
+
 # Fish Pathways
 
 ## Parent-Child Tables
 
-The next logical step in a PIT-tag analysis is to order the nodes, or observation points, by their location along a stream network. Ordering observations is completed with a "parent-child" table. But first we need to extract the sites of interest and place them on the stream using the lat/long data stored in PTAGIS.
+A next typical step in a PIT-tag analysis within a stream or river network is to order the nodes, or observation sites, along the network using their location. Ordering observations is completed using a "parent-child" table. To create a parent-child table, we first need to extract the sites of interest and place them on the stream using the lat/long data stored in PTAGIS. The `PITcleanr` function `extractSites()` can be used to extract detection sites from your complete tag history file. Setting `as_sf == T` will return your data frame as a [simple features](https://r-spatial.github.io/sf/articles/sf1.html) object using the `sf` package.
 
 ```{r extract-sites}
 # extract sites from complete tag histories
-sites_sf = extractSites(raw_ptagis,
+sites_sf = extractSites(cth_file = raw_ptagis,
                         as_sf = T,
                         min_date = '20180301',
                         configuration = config)
@@ -478,18 +489,19 @@ After reviewing the data you may find that some sites should be removed or renam
 
 ```{r remove-sites}
 sites_sf = sites_sf %>%
-  # all sites in Wenatchee and having an rkm greater than or equal to 754
+  # all sites in Wenatchee have an rkm greater than or equal to 754
   filter(str_detect(rkm, '^754'),
-         type != "MRR",
-         site_code != 'LWE') %>%
+         type != "MRR",            # ignore MRR sites
+         site_code != 'LWE') %>%   # ignore a site downstream of Tumwater
   mutate(across(site_code,
                 ~ recode(.,
-                         "TUF" = "TUM")))
+                         "TUF" = "TUM"))) # combine TUM and TUF
 ```
 
 The next step is to download the stream spatial layer from the USGS and the [National Hydrography Dataset](https://www.usgs.gov/national-hydrography/national-hydrography-dataset). The stream layer is downloaded using the `queryFlowlines()` function and is structured as a list that needs to be converted into an `sf` object.
 
 ```{r nhd-flowlines}
+# download subset of NHDPlus flowlines
 nhd_list = queryFlowlines(sites_sf = sites_sf,
                           root_site_code = "TUM",
                           min_strm_order = 2,
@@ -501,7 +513,7 @@ flowlines = nhd_list$flowlines %>%
     rbind(nhd_list$dwn_flowlines)
 ```
 
-You can now build a simple map of your site locations and how they relate to each other across the stream network.
+The `sites_sf` and `flowlines` objects can now be used to create a simple map of your site locations which can be used to understand how nodes or sites relate to each other across the stream network.
 
 ```{r map-sites}
 # load ggplot
@@ -538,7 +550,7 @@ tum_map +
   )
 ```
 
-We can now construct the parent-child table to continue processing the PIT-tag data using `buildParentChild()`.
+These same objects can also be used to construct the parent-child table using `buildParentChild()`. The parent-child table is necessary to understand whether fish movements are upstream or downstream, and is used frequently in further processing of your PIT-tag observations. 
 
 ```{r build-parent-child}
 # build parent-child table
@@ -546,14 +558,14 @@ parent_child = buildParentChild(sites_sf,
                                 flowlines)
 ```
 
-After we build the parent-child table from our complete tag history data and the extracted sites we recommend plotting the nodes to double check all the necessary locations are included. The relationship of nodes to each other can be easily plotted with the `plotNodes()` function.
+After building the parent-child table from the complete tag history data and its extracted sites, we recommend plotting the nodes to double-check all the locations of interest are included. The relationship of nodes to each other can be easily plotted with the `plotNodes()` function.
 
 ```{r plot-parent-child}
 # plot parent-child table
 plotNodes(parent_child)
 ```
 
-If errors in the parent-child table exist they can be edited using the `editParentChild()` function. More details regarding these functions can be found [here](https://kevinsee.github.io/PITcleanr/articles/parent_child.html).
+Sometimes errors occur in the parent-child table (e.g., due to errors in lat/lon data, points being "snapped" poorly to flowlines). In this case, the parent-child table can be edited using the `editParentChild()` function. Additional details regarding these functions can be found [here](https://kevinsee.github.io/PITcleanr/articles/parent_child.html).
 
 ```{r edit-parent-child}
 # edit parent-child table
@@ -572,7 +584,7 @@ plotNodes(parent_child)
 
 ### Add Nodes (Arrays)
 
-If the configuration file contains multiple nodes for some sites (e.g., a node for each array at a site), then the parent-child table can be expanded to accommodate these nodes using the addParentChildNodes() function.
+If the configuration file contains multiple nodes for some sites (e.g., a node for each array at a site), then the parent-child table can be expanded to accommodate these nodes using the `addParentChildNodes()` function.
 
 ```{r add-nodes}
 # add nodes for arrays
@@ -585,11 +597,12 @@ plotNodes(parent_child_nodes)
 
 ## Movement Paths
 
-`PITcleanr` provides a two functions to determine the detection locations a tag would pass between a starting point (e.g, a tagging or release location) and an ending point (e.g., each subsequent detection point), based on the parent-child table. We refer to these detection locations as a movement path. They are equivalent to following one of the paths in the figures above. The `buildPaths` function creates the path, and `buildNodeOrder` assigns the nodes's order in the pathway. Each of these functions currently has an argument, direction that provides paths and node orders based on upstream movement (the default) or downstream movement. For downstream movement, each node may appear in the resulting tibble multiple times, as there may be multiple ways to reach that node, from different starting points.
+`PITcleanr` provides two functions to determine the detection locations a tag would need to pass between a starting point (e.g., a tagging or release location) and an ending point (e.g., each subsequent upstream or downstream detection point), based on the parent-child table. We refer to these detection locations as a movement path. They are equivalent to following one of the paths in the figures above. The `buildPaths()` function creates the path, and `buildNodeOrder()` goes one additional step and assigns the node's order in the pathway. Each of these functions includes the argument `direction` which can be used to provide paths and node orders based on upstream (e.g., adults; the default) or downstream (e.g., juvenile) movements. For downstream movement, each node may appear in the resulting tibble multiple times, as there may be multiple ways to reach that node, from different starting points.
 
 ```{r node-order}
 # build paths and add node order
-node_order = buildNodeOrder(parent_child = parent_child_nodes)
+node_order = buildNodeOrder(parent_child = parent_child_nodes,
+                            direction = "u")
 
 # view node paths and orders
 node_order %>%
@@ -601,7 +614,7 @@ node_order %>%
 
 ## Travel Direction
 
-With the parent-child relationships established, `PITcleanr` can assign a direction between each node where a given tag was detected.
+With the parent-child relationships established, `PITcleanr` can assign a movement direction between each node where a given tag was detected using the function `addDirection()`.
 
 ```{r add-direction}
 # add direction based on parent-child table
@@ -619,9 +632,9 @@ head(comp_dir, 6) %>%
 
 For some types of analyses, such as Cormack-Jolly-Seber (CJS) models, one of the assumptions is that a tag/individual undergoes only one-way travel (i.e., travel is either all upstream or all downstream). To meet this assumption, individual detections sometimes need to be discarded. For example, an adult salmon undergoing an upstream spawning migration may move up into the Icicle Creek branch of our node network, and then later move back downstream and up another tributary to their final spawning location. In this case, any detections that occurred in Icicle Creek would need to be discarded.
 
-`PITcleanr` contains a function, `filterDetections()`, to help determine which tags/individuals fail to meet the one-way travel assumption and need to be examined further. `filterDetections()` first runs `addDirection()` from above, and then adds two columns, `auto_keep_obs` and `user_keep_obs`. These are meant to indicate whether each row should be kept (i.e. marked TRUE) or deleted (i.e. marked FALSE). For tags that do meet the one-way travel assumption, both auto_keep_obs and user_keep_obs columns will be filled. And if a fish moves back and forth along the same path, `PITcleanr` will indicate that only the last detection at each node should be kept.
+`PITcleanr` contains a function, `filterDetections()`, to help determine which tags/individuals fail to meet the one-way travel assumption and need to be examined further. `filterDetections()` first runs `addDirection()` from above, and then adds two columns, "auto_keep_obs" and "user_keep_obs". These are meant to suggest whether each row should be kept (i.e. marked `TRUE`) or deleted (i.e. marked `FALSE`). For tags that *do* meet the one-way travel assumption, both "auto_keep_obs" and "user_keep_obs" columns will be filled. Further, if a fish moves back and forth within the same path, `PITcleanr` will indicate that only the last detection at each node should be kept.
 
-If a tag fails to to meet that assumption (e.g. at least one direction is unknown), the `user_keep_obs` column will be NA for all observations of that tag. The `auto_keep_obs` column is `PITcleanr`'s best guess as to which detections should be kept. This guess is based on the assumption that the last and furthest forward-moving detection should be kept, and all detections along that movement path should be kept, while dropping others.
+If a tag fails to meet that assumption (e.g., at least one direction is unknown), the "user_keep_obs" column will be `NA` for all observations of that tag. In this case, the "auto_keep_obs" column is `PITcleanr`'s best guess as to which detections should be kept. This guess is based on the assumption that the last and furthest forward-moving detection should be kept, and all detections along that movement path should be kept, which dropping others.
 
 ```{r filter-detections}
 # add direction, and filter detections
@@ -634,6 +647,7 @@ comp_filter %>%
   select(tag_code:min_det, 
          direction,
          ends_with("keep_obs")) %>%
+  # view a strange movement path
   filter(is.na(user_keep_obs)) %>%
   filter(tag_code == tag_code[1]) %>%
   kable() %>%
@@ -641,7 +655,7 @@ comp_filter %>%
                 bootstrap_options = "striped")
 ```
 
-The user can then save the output from `filterDetections()`, and fill in all the blanks in the `user_keep_obs` column. The `auto_keep_obs` column is merely a suggestion from `PITcleanr`, the user should use their own knowledge of the landscape, where the detection sites are, the run timing and general spatial patterns of that population to make final decisions. Once all the blank user_keep_obs cells have been filled in, that output can be read back into R and filtered for when `user_keep_obs == TRUE`, and the analysis can proceed from there.
+The user can save the output from `filterDetections()`, and fill in all the blanks in the "user_keep_obs" column. The "auto_keep_obs" column is merely a suggestion from `PITcleanr`, the user should use their own knowledge of the landscape, where the detection sites are, the run timing and general spatial patterns of that population to make final decisions. Once all the blank "user_keep_obs" cells have been filled in, that output can be read back into R and filtered for when `user_keep_obs == TRUE`, and the analysis can proceed from there.
 
 Below, we move forward trusting `PITcleanr`'s algorithm.
 
@@ -682,7 +696,7 @@ tum_map +
 
 ## Detection Efficiencies
 
-Generally we want to use the number of tags detected as a surrogate to all fish passing the site; however, the detection efficiencies at instream PIT tag arrays is often vary different. To understand detection efficiency difference across sites, and to quickly expand observed tags into estimated tags passing the site `PITcleanr` offers a quick solution. `estNodeEff` uses the corrected observations and node pathways to estimate efficiencies.
+Oftentimes, we want to use the number of tags detected at a site as a surrogate to all fish passing the site; however, the detection probablity or efficiencies among INT sites is sometimes very different. To understand detection efficiencies across sites, and to quickly expand observed tags into estimated tags passing the site, `PITcleanr` offers a quick solution. The function `estNodeEff` uses the corrected observations and node pathways to estimate detecion efficiencies using your dataset. 
 
 ```{r est-eff}
 # estimate detection efficiencies for nodes
@@ -690,24 +704,28 @@ node_eff = estNodeEff(capHist_proc = comp_final,
                       node_order = node_order)
 
 # view node efficiencies
-node_eff
+node_eff %>%
+  kable() %>%
+  kable_styling(full_width = T,
+                bootstrap_options = "striped")
 ```
 
 ## Capture Histories
 
-Finally, various mark-recapture models require a capture history of 1's and 0's as inputs. `PITcleanr` contains two functions that can help convert tag observations into capture history matrices. `buildCapHist()` uses the compressed observations (whether they've been through `filterDections()` or not) and converts them into capture history matrix that can be used in various R survival packages (e.g., Mark). One key will be to ensure the nodes or sites are put in correct order for the user.
+Finally, various mark-recapture models require a capture history of 1's and 0's as inputs. `PITcleanr` contains two functions that can help convert tag observations into capture history matrices. `buildCapHist()` uses the compressed observations (whether they've been through `filterDections()` or not) and converts them into capture history matrix that can be used in various R survival packages (e.g., `marked`). One key will be to ensure the nodes or sites are put in correct order for the user. Note: the `drop_nodes` argument can be set to `FALSE` to retain columns for individual nodes.
 
 ```{r cap-hist}
 # build capture histories
 cap_hist = buildCapHist(filter_ch = comp_filter,
                         parent_child = parent_child,
-                        configuration = config)
+                        configuration = config,
+                        drop_nodes = T)
 
 # view capture histories
 cap_hist
 ```
 
-While the `defineCapHistCols()` function identifies the site or node associated with the position of each 1 and 0.
+The `defineCapHistCols()` function can be used to identify the site or node associated with the position of each 1 and 0 in the capture history matrix.
 
 ```{r cap-hist-names}
 col_nodes <- defineCapHistCols(parent_child = parent_child,
@@ -718,6 +736,7 @@ col_nodes
 ```
 
 ```{r rm-objects}
+# clear environment, if desired
 rm(list = ls())
 ```
 
