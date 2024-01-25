@@ -55,7 +55,7 @@ This document serves as a tutorial to the most common functions contained with `
 ## Load Packages
 Once `PITcleanr` is successfully installed it can be loaded into the R session using the `library()` function. In this workshop, we will also use functions from the following packages; `tidyverse`, `sf`, and `kableExtra`. Use the `install.packages()` function for packages that are not already installed.
 
-````{r load-packages}
+```{r load-packages}
 # E.g., for packages not installed:
 # install.packages(c("tidyverse", "sf"))
 
@@ -636,7 +636,16 @@ node_tags <- sites_sf %>%
 
 # plot tags on the map from above
 tum_map +
-   ggrepeal::geom_sf_label(data = node_tags, aes(label = n_tags))
+  geom_sf(data = node_tags) +
+  ggrepel::geom_label_repel(
+    data = node_tags,
+    aes(label = n_tags, 
+        geometry = geometry),
+    size = 2,
+    stat = "sf_coordinates",
+    min.segment.length = 0,
+    max.overlaps = 50
+  )
 ```
 
 ## Detection Efficiencies
@@ -1083,7 +1092,7 @@ est_preds$Phi |>
 
 Estimating fish survival is complex and requires multiple assumptions. Be careful following this script and reproducing results with your own data. We do not guarantee the steps listed above will yield perfect results, and they will require adjustments to fit your needs. The steps were only provided to get you started with `PITcleanr`. Please reach out to the authors if you have questions or need assistance using the package.
 
-```{r build-script, echo = FALSE}
+```{r build-script, eval=FALSE, echo = FALSE}
 knitr::purl(input = paste0(here::here(),"/docs/practical_examples.Rmd"),
              output = paste0(here::here(),"/docs/practical_examples_script.R"))
 ```
