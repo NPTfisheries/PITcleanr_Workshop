@@ -208,6 +208,7 @@ tag_list = system.file("extdata",
                        mustWork = TRUE)
 
 read_delim(tag_list, delim='\t') %>%
+  head(9) %>%
   kable() %>%
   kable_styling(full_width = TRUE,
                 bootstrap_options = "striped")
@@ -264,10 +265,14 @@ We can compare the downloaded complete tag history file with the output of the `
 
 ```{r compare-cth}
 head(raw_ptagis, 4) %>%
-  kable()
+  kable() %>%
+  kable_styling(full_width = TRUE,
+              bootstrap_options = "striped")
 
 head(read_csv(ptagis_file), 4) %>%
-  kable()
+  kable() %>%
+  kable_styling(full_width = TRUE,
+                bootstrap_options = "striped")
 ```
 
 Note that `readCTH()` includes the argument file_type which can be used to import data from Biomark’s BioLogic (“Biologic_csv”) database or data downloaded directly from a PIT-tag reader, in either a .log or .xlsx format (“raw”). These formats may be useful for smaller studies or studies outside the Columbia River Basin whose data may not be uploaded to PTAGIS.
@@ -287,7 +292,9 @@ qc_detections = qcTagHistory(raw_ptagis)
 qc_detections
 
 qc_detections$rel_time_batches %>%
-  kable()
+  kable() %>%
+  kable_styling(full_width = TRUE,
+                bootstrap_options = "striped")
 ```
 
 ### Single Tag Codes and Marking Files
@@ -365,7 +372,8 @@ mrr_data %>%
            species_run_rear_type) %>%
   count() %>%
   kable() %>%
-  kable_styling(full_width = TRUE)
+  kable_styling(full_width = TRUE,
+                bootstrap_options = "striped")
 ```
 
 The mark data from `queryMRRDataFile()` and the observations data from `queryCapHist()` could also be combined to form a complete tag history. However, this process is not recommended for large number of tag codes.
@@ -531,9 +539,10 @@ If errors in the parent-child table exist they can be edited using the `editPare
 ```{r edit-parent-child}
 # edit parent-child table
 parent_child = editParentChild(parent_child,
-                       fix_list = list(c('TUM', 'LNF', 'ICL'),
-                                       c('TUM', 'ICM', 'ICL'))
-                       ) %>%
+                               fix_list = list(c(NA, "PES", "TUM"),
+                                               c(NA, "LNF", "ICL"),
+                                               c("PES", "ICL", "TUM")),
+                               switch_parent_child = list(c("ICL", 'TUM'))) %>%
   filter(!is.na(parent))
 ```
 
@@ -559,12 +568,14 @@ plotNodes(parent_child_nodes)
 
 ```{r node-order}
 # build paths and add node order
-node_order = buildNodeOrder(parent_child = parent_child)
+node_order = buildNodeOrder(parent_child = parent_child_nodes)
 
 # view node paths and orders
 node_order %>%
   arrange(node) %>%
-  kable()
+  kable() %>%
+  kable_styling(full_width = TRUE,
+                bootstrap_options = "striped")
 ```
 
 ## Travel Direction
@@ -574,11 +585,13 @@ With the parent-child relationships established, `PITcleanr` can assign a direct
 ```{r add-direction}
 # add direction based on parent-child table
 comp_dir <- addDirection(compress_obs = comp_obs, 
-                         parent_child = parent_child, 
+                         parent_child = parent_child_nodes, 
                          direction = "u")
 
 head(comp_dir, 6) %>%
-  kable()
+  kable() %>%
+  kable_styling(full_width = TRUE,
+                bootstrap_options = "striped")
 ```
 
 ## Filter Detections
@@ -592,7 +605,7 @@ If a tag fails to to meet that assumption (e.g. at least one direction is unknow
 ```{r filter-detections}
 # add direction, and filter detections
 comp_filter = filterDetections(compress_obs = comp_obs, 
-                               parent_child = parent_child,
+                               parent_child = parent_child_nodes,
                                max_obs_date = "20180930")
 
 # view filtered observations
@@ -627,10 +640,9 @@ node_tags = comp_final %>%
 node_tags
 ```
 
-Or you could map the number of tags at each site.
 
-```{r plot-est-tags}
-
+```{r plot-est-tags, eval = FALSE, echo = FALSE}
+# Or you could map the number of tags at each site.
 node_tags <- sites_sf %>%
    left_join(node_tags, by = c('node_site' = 'node'))
 
@@ -1058,7 +1070,9 @@ est_preds$Phi %>%
 est_preds$Phi |> 
   mutate(across(where(is.numeric),
          ~ round(., digits = 3))) %>%
-  kable()
+  kable() %>%
+  kable_styling(full_width = TRUE,
+                bootstrap_options = "striped")
 
 ```
 
@@ -1074,7 +1088,9 @@ est_preds$p %>%
 est_preds$p |> 
   mutate(across(where(is.numeric),
          ~ round(., digits = 3))) %>%
-  kable()
+  kable() %>%
+  kable_styling(full_width = TRUE,
+                bootstrap_options = "striped")
 ```
 
 In this example, a user might be interested in the cummulative survival of fish from the Upper Lemhi screw trap to certain dams like Lower Granite, McNary, and John Day. These can be obtained by multiplying survival estimates up to the location of interest. Because the final survival and detection probabilties are confounded in this type of CJS model, we can’t estimate cummulative survival to Bonneville dam (B2J) unless we added detection sites either within the estuary or of adults returning to Bonneville.
