@@ -14,7 +14,17 @@ to_pdf(from = "rmd/PITcleanr_Presentation.html",
        complex_slides = T,
        partial_slides = T)
 
+# render presentation into powerpoint
+to_pptx(from = "rmd/PITcleanr_Presentation.html",
+        to = "rmd/PITcleanr_Presentation.pptx",
+        density = 300,
+        complex_slides = T,
+        partial_slides = T,
+        delay = F,
+        ratio = "16:9")
 
+#-----------------------------------------------------------------
+# try a different package
 library(pagedown)
 
 chrome_print(input = "rmd/PITcleanr_Presentation.html",
