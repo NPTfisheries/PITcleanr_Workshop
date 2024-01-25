@@ -16,7 +16,9 @@ output:
     number_sections: yes
 always_allow_html: yes
 ---
-`
+
+\`
+
 ```{r chunk-opts, echo = FALSE, message = FALSE, warning = FALSE, results = "hide"}
 # knitr options
 knitr::opts_chunk$set(
@@ -38,21 +40,29 @@ api_key = '1AA5CF55-C98E-4001-96E4-1E96CEE1E806'
 ```
 
 # Introduction
-PIT-tag data is often difficult to summarize into meaningful information due to the large amount of tag observations. For instance, PTAGIS serves as a data repository containing a single record for every observation of a tag code; including the initial detection, or “mark”, when the tag is implanted, and all subsequent detections on each antenna the tag passes, or at recapture (e.g., at weirs), and recovery (e.g., carcass surveys) sites. The number of detections that exist for each individual tag code can easily be in excess of 1,000s of observations. Therefore, querying PTAGIS for all detections of a large number of tags often lends to a wealth of data that is unwieldy to process. `PITcleanr` aims to “compress” or minimize the data to a more manageable size, without losing any of the information contained in the full dataset, and to provide useful tools to help organize the data into fish pathways and stream networks.
 
-This document serves as a tutorial to the most common functions contained with `PITcleanr` and provides some simple data summaries that may help you get started using the package, and performing your own PIT-tag data analyses. The workshop contains four sections: querying data, compressing tag observations, developing fish pathways, and finally an example case study.
+PIT-tag data is often difficult to summarize into meaningful information due to the large amount of tag observations. For instance, PTAGIS serves as a data repository containing a single record for every observation of a tag code; including the initial detection, or "mark", when the tag is implanted, and all subsequent detections on each antenna the tag passes, or at recapture (e.g., at weirs), and recovery (e.g., carcass surveys) sites. The number of detections that exist for each individual tag code can easily be in excess of 1,000s of observations. Therefore, querying PTAGIS for all detections of a large number of tags often leads to a wealth of data that is unwieldy to process. `PITcleanr` aims to "compress" or minimize the data to a more manageable size, without losing any of the information contained in the full dataset, and to provide useful tools to help organize the data into fish pathways and stream networks.
+
+This document serves as a tutorial to the most common functions contained in `PITcleanr` and provides some simple data summaries that may help you get started using the package, and performing your own PIT-tag data analyses. The workshop contains four sections: 
+
+* querying data, 
+* compressing tag observations, 
+* developing fish pathways, and finally, 
+* an example case study.
 
 ## Installation
-`PITcleanr` can be installed from GitHub using the R `remotes` package. Additional information on package installation can be found on the website [README](https://github.com/KevinSee/PITcleanr).
+
+`PITcleanr` can be installed from GitHub using the R `remotes` package. Additional information on package installation can be found on the `PITcleanr` website [README](https://github.com/KevinSee/PITcleanr).
 
 ```{r install-pitcleanr, eval = FALSE}
-## # install PITcleanr, if necessary
-## install.packages("remotes")
-## remotes::install_github("KevinSee/PITcleanr",
-##                          build_vignettes = TRUE)
+# install PITcleanr, if necessary
+install.packages("remotes")
+remotes::install_github("KevinSee/PITcleanr",
+                        build_vignettes = TRUE)
 ```
 
 ## Load Packages
+
 Once `PITcleanr` is successfully installed it can be loaded into the R session using the `library()` function. In this workshop, we will also use functions from the following packages; `tidyverse`, `sf`, and `kableExtra`. Use the `install.packages()` function for packages that are not already installed.
 
 ```{r load-packages}
@@ -67,17 +77,18 @@ library(kableExtra)
 ```
 
 # Query Site Data
-## Interrogation Sites
-You can use `PITcleanr` to query and download metadata for PTAGIS interrogation sites using the function `queryInterrogationMeta()`. The `site_code` argument is used to specify sites; alternatively, set `site_code = NULL` to retrieve metadata for all sites.
 
+## Interrogation Sites
+
+`PITcleanr` can be used to query and download metadata for PTAGIS interrogation sites using the function `queryInterrogationMeta()`. The `site_code` argument is used to specify sites; alternatively, set `site_code = NULL` to retrieve metadata for all sites.
 
 ```{r int-meta}
 # interrogation site metadata
-int_meta_KRS = queryInterrogationMeta(site_code = "KRS")
+int_meta_KRS = queryInterrogationMeta(site_code = "KRS") # South Fork Salmon River, Krassel
 int_meta = queryInterrogationMeta(site_code = NULL)
 ```
 
-As a simple example, after downloading the interrogation metadata you can quickly summarize the number of active instream remote detections systems in PTAGIS by organization using tidyverse functions.
+As a simple example, after downloading the interrogation metadata you can quickly summarize the number of active instream remote detections systems in PTAGIS by organization using `tidyverse` functions.
 
 ```{r count-iptds}
 # count active instream remote sites by organization
@@ -94,13 +105,13 @@ Or, we can use the `int_meta` object to map our interrogation sites using the `s
 
 ```{r int-map}
 # plot location of interrogation sites
-#install.packages('maps')
+# install.packages('maps')
 
 # get state boundaries
 pnw = st_as_sf(maps::map("state", 
                    region = c('ID', 'WA', 'OR'), 
                    plot = FALSE, 
-                   fill = TRUE)) # get state boundaries
+                   fill = TRUE))
 
 # create spatial feature object of IPTDS
 int_sf <- int_meta %>% 
@@ -119,7 +130,7 @@ ggplot() +
 
 ```{r int-config}
 # configuration of an interrogation site
-int_config <- queryInterrogationConfig(site_code = 'ZEN')
+int_config <- queryInterrogationConfig(site_code = 'ZEN') # Secesh River, Zena Creek Ranch
 
 int_config %>%
   kable() %>%
@@ -129,7 +140,7 @@ int_config %>%
 
 ## Mark/Recapture/Recovery Sites
 
-A similar function exists to query and download metadata for PTAGIS mark-recapture-recovery (MRR) sites; however, configuration data doesn’t exist for MRR sites so there is no need for a `queryMRRConfig` function.
+A similar function exists to query and download metadata for PTAGIS mark-recapture-recovery (MRR) sites; however, configuration data doesn't exist for MRR sites so there is no need for a `queryMRRConfig()` function.
 
 ```{r mrr-meta}
 # all MRR sites
@@ -143,7 +154,7 @@ head(mrr_meta, 3) %>%
 
 ## All PTAGIS Sites
 
-`PITcleanr` includes additional wrapper functions that can query interrogation and MRR sites together. The `queryPtagisMeta()` function downloads all INT and MRR sites at once. While the `buildConfig()` function goes a step further and downloads all INT and MRR site metadata, plus INT site configuration information, and then applies some formatting to combine all metadata into a single data frame. Additionally, `buildConfig()` creates a `node` field which is a unique location which groups detections by a user defined spatial scale.
+`PITcleanr` includes additional wrapper functions that can query interrogation and MRR sites together. The `queryPtagisMeta()` function downloads all INT and MRR sites at once. The `buildConfig()` function goes a step further and downloads all INT and MRR site metadata, plus INT site configuration information, and then applies some formatting to combine all metadata into a single data frame. Additionally, `buildConfig()` creates a `node` field which can be used to assign and group detections to a user-specified spatial scale.
 
 ```{r all-ptagis-sites}
 # wrapper to download all site meta
@@ -169,36 +180,46 @@ head(config, 9) %>%
                 bootstrap_options = "striped")
 ```
 
-The `buildConfig()` column includes the arguments `node_assign` and `array_suffix`. The node_assign argument includes the options `c("array", "site", "antenna")` which allows the user to assign PIT tag arrays, entire sites, or individual antennas, respectively, which can then be used as a grouping variable for subsequent data prep and analysis. By default, observations are assigned to individual "array"s, and upstream and downstream arrays are assigned the suffixes “_U” and “_D”, respectively. In the case of 3-span arrays, observations at the middle array are assigned to the upstream array. Play with the different settings and review the output to learn the differences.
+The `buildConfig()` column includes the arguments `node_assign` and `array_suffix`. The node_assign argument includes the options `c("array", "site", "antenna")` which allows the user to assign PIT tag arrays, entire sites, or individual antennas, respectively, as `nodes`, which can then be used as a grouping variable for subsequent data prep and analysis. In the case `node_assign = "array"`, the `array_suffix` can be used to assign suffixes to each PIT-tag array. By default, observations are assigned to individual arrays, and upstream and downstream arrays are assigned the suffixes "_U" and "_D", respectively. In the case of 3-span arrays, observations at the middle array are assigned to the upstream array. Play with the different settings and review the output to learn the differences.
 
 ```{r build-site-array, eval = FALSE}
-tmp_config <- buildConfig(node_assign = "site", #"array", "site", "antenna"
-                      array_suffix = "UMD") #"UD", "UMD", "AOBO"
+tmp_config <- buildConfig(node_assign = "site") # c("array", "site", "antenna)
+
+# The option to use "UMD" is still in development.
+tmp_config <- buildConfig(node_assign = "array",
+                          array_suffix = "UMD") # c("UD", "UMD", "AOBO")
 ```
 
 ## Test Tags
-To help assess a site’s operational condition `PITcleanr` includes the function `queryTestTagSite()`. The function queries the test tag history from PTAGIS for a single interrogation site during a calendar year. The test tag information is useful to quickly examine the site for operation conditions and to help understand potential assumption violations with future analyses.
+
+To help assess a site's operational condition `PITcleanr` includes the function `queryTestTagSite()`. The function queries the test tag history from PTAGIS for a single interrogation site during a calendar year. The test tag information is useful to quickly examine the site for operation conditions and to help understand potential assumption violations with future analyses.
 
 ```{r test-tag}
 # check for timer tag to evaluate site operation
 test_tag = queryTestTagSite(site_code = "ZEN", 
                             year = 2023, 
-                            api_key = api_key)
+                            api_key = api_key) # requires an API key
 
 test_tag %>%
   ggplot(aes(x = time_stamp, y = 1)) +
   geom_point() +
+  theme(axis.text.x = element_text(angle = -45, vjust = 0.5),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank()) +
   facet_grid(antenna_id~transceiver_id)
 ```
 
 # Compressing Tag Observations
+
 ## PTAGIS Complete Tag Histories
 
 In a typical PIT tag analysis workflow a user starts with a list of tags containing all the codes of interest, and then searches a data repository for all the observations of the listed tags.
 
 ### Tag List
 
-A tag list is typically a .txt file with one row per tag code. For convenience, we’ve included one such file with `PITcleanr`, which contains tag IDs for Chinook salmon adults implanted with tags at Tumwater Dam in 2018. The following can be used to find the path to this example file. Alternatively, the user can provide the file path to their own tag list.
+A tag list is typically a .txt file with one row per tag code. For convenience, we've included one such file with `PITcleanr`, which contains tag IDs for Chinook salmon adults implanted with tags at Tumwater Dam in 2018. The following can be used to find the path to this example file. Alternatively, the user can provide the file path to their own tag list.
 
 ```{r tag-list}
 # generate file path to example tag list in PITcleanr
@@ -208,35 +229,34 @@ tag_list = system.file("extdata",
                        mustWork = TRUE)
 
 read_delim(tag_list, delim='\t') %>%
-  head(9) %>%
-  kable() %>%
+  head(5) %>%
+  kable(col.names = NULL) %>%
   kable_styling(full_width = TRUE,
                 bootstrap_options = "striped")
-
 # or simple example to your own file on desktop
 #tag_list = "C:/Users/username/Desktop/my_tag_list.txt"
 ```
 
 ### Read PTAGIS CTH
 
-Once the user has created their own tag list, or located the above example, load the list into PTAGIS to query the complete tag history for each of the listed tags. Detailed instructions for querying complete tag histories for use in PITcleanr can be found [here](https://kevinsee.github.io/PITcleanr/articles/Prep_PIT_data.html). The following fields or attributes are required in the PTAGIS complete tag history query:
+Once the user has created their own tag list, or located the above example, load the list into PTAGIS to query the complete tag history for each of the listed tags. Detailed instructions for querying complete tag histories in PTAGIS for use in PITcleanr can be found [here](https://kevinsee.github.io/PITcleanr/articles/Prep_PIT_data.html). The following fields or attributes are required in the PTAGIS complete tag history query:
 
-* Tag
-* Event Site Code
-* Event Date Time
-* Antenna
-* Antenna Group Configuration
+-   Tag
+-   Event Site Code
+-   Event Date Time
+-   Antenna
+-   Antenna Group Configuration
 
 Other available PTAGIS fields of interest may also be included. We highly recommended the following fields to help with future summaries:
 
-* Mark Species
-* Mark Rear Type
-* Event Type
-* Event Site Type
-* Event Release Site Code
-* Event Release Date Time
+-   Mark Species
+-   Mark Rear Type
+-   Event Type
+-   Event Site Type
+-   Event Release Site Code
+-   Event Release Date Time
 
-For convenience, we’ve included an example complete tag history in `PITcleanr` from the above tag list, or you can provide the file path to your own complete tag history.
+For convenience, we've included an example complete tag history in `PITcleanr` from the above tag list, or you can provide the file path to your own complete tag history.
 
 ```{r ptagis-filepath}
 # file path to the example CTH in PITcleanr
@@ -275,11 +295,11 @@ head(read_csv(ptagis_file), 4) %>%
                 bootstrap_options = "striped")
 ```
 
-Note that `readCTH()` includes the argument file_type which can be used to import data from Biomark’s BioLogic (“Biologic_csv”) database or data downloaded directly from a PIT-tag reader, in either a .log or .xlsx format (“raw”). These formats may be useful for smaller studies or studies outside the Columbia River Basin whose data may not be uploaded to PTAGIS.
+Note that `readCTH()` includes the argument `file_type` which can be used to import data from Biomark's BioLogic ("Biologic_csv") database or data downloaded directly from a PIT-tag reader, in either a .log or .xlsx format ("raw"). These formats may be useful for smaller studies or studies outside the Columbia River Basin whose data may not be uploaded to PTAGIS.
 
 ### Quality Control
 
-The `qcTagHistory()` function is used to perform basic quality control on PTAGIS detections. Note it can be run on either the file path to the complete tag histories or the data frame returned by `readCTH()`. `qcTagHistory()` provides information on disowned and orphan tags and information on the various release groups included in the detections. More info can be found here.
+The `qcTagHistory()` function can be used to perform basic quality control on PTAGIS detections. Note it can be run on either the file path to the complete tag histories or the data frame returned by `readCTH()`. `qcTagHistory()` provides information on disowned and orphan tags and information on the various release groups included in the detections. For more information, see the [PTAGIS FAQ website](https://www.ptagis.org/faq#11).
 
 ```{r qc-data}
 # using the complete tag history file path
@@ -288,9 +308,7 @@ qc_detections = qcTagHistory(ptagis_file)
 # or the complete tag history tibble from readCTH()
 qc_detections = qcTagHistory(raw_ptagis)
 
-# view QC results
-qc_detections
-
+# view release batch information
 qc_detections$rel_time_batches %>%
   kable() %>%
   kable_styling(full_width = TRUE,
@@ -299,7 +317,7 @@ qc_detections$rel_time_batches %>%
 
 ### Single Tag Codes and Marking Files
 
-Often you may be interested in observations for a single tag code. To help with this, `PITcleanr` contains the `queryCapHist()` function to query observations for a single tag from DART’s mirrored data repository of PTAGIS. This function can be helpful if you are interested in a small number of tag codes and want to programmatically develop summaries. The function requires a tag code input and will return observation data post marking.
+Often you may be interested in observations for a single tag code. To help with this, `PITcleanr` contains the `queryCapHist()` function to query observations for a single tag from DART's mirrored data repository of PTAGIS. This function can be helpful if you are interested in a small number of tag codes and want to programmatically develop summaries. The function requires a tag code input and will return observation data post marking.
 
 ```{r complete-tag-history}
 # query PTAGIS complete tag history for a single tag code; some examples
@@ -321,16 +339,15 @@ tag_cth %>%
             bootstrap_options = 'striped') 
 ```
 
-DART no longer provides mark event information with a tag code’s observation data. If the marking information is necessary you can change the argument `include_mark` to TRUE to also query the PTAGIS marking record. Note: including the mark record requires a PTAGIS “API Key” which can be requested from the [PTAGIS API website](https://www.ptagis.org/Content/DataSpecification/index.htm?context=160).
+DART no longer provides mark event information with a tag code's observation data. If the marking information is necessary you can change the argument `include_mark` to `TRUE` to also query the PTAGIS marking record. Note: including the mark record requires a PTAGIS "API Key" which can be requested from the [PTAGIS API website](https://www.ptagis.org/Content/DataSpecification/index.htm?context=160).
 
 ```{r complete-tag-history-node, eval = FALSE}
 cth_node <- queryCapHist(ptagis_tag_code = tagID,
-                         config = config,
                          include_mark = TRUE,
                          api_key = api_key)
 ```
 
-Additionally, the `queryMRRDataFile()` function can be used to query a raw MRR file from PTAGIS. NOTE: only the latest corrected version of a MRR file is returned.
+Additionally, the `queryMRRDataFile()` function can be used to query a raw MRR file from PTAGIS. NOTE: only the latest corrected version of the MRR file is returned.
 
 ```{r MRR-single-file}
 # MRR tag file summaries
@@ -341,9 +358,13 @@ mrr_data <- queryMRRDataFile(mrr_file)
 
 # summary of injuries
 mrr_data %>%
-  group_by(species_run_rear_type, text_comments) %>%
+  group_by(species_run_rear_type, 
+           text_comments) %>%
+  filter(!is.na(text_comments)) %>% # remove NA comments
   count() %>%
-  ggplot(aes(x = text_comments, y = n, fill = species_run_rear_type)) +
+  ggplot(aes(x = text_comments, 
+             y = n, 
+             fill = species_run_rear_type)) +
   geom_col() +
   coord_flip() +
   labs(title = paste0(unique(mrr_data$release_site), ' : ', mrr_file))
@@ -380,7 +401,7 @@ The mark data from `queryMRRDataFile()` and the observations data from `queryCap
 
 ## Compress Detections
 
-After downloading the complete tag history data from PTAGIS and reading the file into the R environment with `readCTH` we are now ready to start summarizing the information. The first step is to `compress` the tag histories into a more manageable format based on the “array” configuration from above step using the function `buildConfg` and the argument `node_assign`.
+After downloading the complete tag history data from PTAGIS and reading the file into the R environment with `readCTH` we are now ready to start summarizing the information. The first step is to `compress` the tag histories into a more manageable format based on the "array" configuration from above step using the function `buildConfg` and the argument `node_assign`.
 
 ```{r start-fresh, eval=FALSE, echo=FALSE}
 ## # clear environment
@@ -413,7 +434,6 @@ After downloading the complete tag history data from PTAGIS and reading the file
 ##   read_csv(show_col_types = F)
 ```
 
-
 ```{r compress}
 # compress observations
 comp_obs = compress(raw_ptagis,
@@ -444,7 +464,7 @@ comp_obs %>%
 
 ## Parent-Child Tables
 
-The next logical step in a PIT-tag analysis is to order the nodes, or observation points, by their location along a stream network. Ordering observations is completed with a “parent-child” table. But first we need to extract the sites of interest and place them on the stream using the lat/long data stored in PTAGIS.
+The next logical step in a PIT-tag analysis is to order the nodes, or observation points, by their location along a stream network. Ordering observations is completed with a "parent-child" table. But first we need to extract the sites of interest and place them on the stream using the lat/long data stored in PTAGIS.
 
 ```{r extract-sites}
 # extract sites from complete tag histories
@@ -453,7 +473,6 @@ sites_sf = extractSites(raw_ptagis,
                         min_date = '20180301',
                         configuration = config)
 ```
-
 
 After reviewing the data you may find that some sites should be removed or renamed for your particular analysis. This step can easily be accomplished with `tidyverse` commands. For our example, we are only interested in interrogation sites upstream of Tumwater Dam, and we want to combine both Tumwater detection sites; TUM and TUF.
 
@@ -552,6 +571,7 @@ plotNodes(parent_child)
 ```
 
 ### Add Nodes (Arrays)
+
 If the configuration file contains multiple nodes for some sites (e.g., a node for each array at a site), then the parent-child table can be expanded to accommodate these nodes using the addParentChildNodes() function.
 
 ```{r add-nodes}
@@ -564,7 +584,8 @@ plotNodes(parent_child_nodes)
 ```
 
 ## Movement Paths
-`PITcleanr` provides a two functions to determine the detection locations a tag would pass between a starting point (e.g, a tagging or release location) and an ending point (e.g., each subsequent detection point), based on the parent-child table. We refer to these detection locations as a movement path. They are equivalent to following one of the paths in the figures above. The `buildPaths` function creates the path, and `buildNodeOrder` assigns the nodes’s order in the pathway. Each of these functions currently has an argument, direction that provides paths and node orders based on upstream movement (the default) or downstream movement. For downstream movement, each node may appear in the resulting tibble multiple times, as there may be multiple ways to reach that node, from different starting points.
+
+`PITcleanr` provides a two functions to determine the detection locations a tag would pass between a starting point (e.g, a tagging or release location) and an ending point (e.g., each subsequent detection point), based on the parent-child table. We refer to these detection locations as a movement path. They are equivalent to following one of the paths in the figures above. The `buildPaths` function creates the path, and `buildNodeOrder` assigns the nodes's order in the pathway. Each of these functions currently has an argument, direction that provides paths and node orders based on upstream movement (the default) or downstream movement. For downstream movement, each node may appear in the resulting tibble multiple times, as there may be multiple ways to reach that node, from different starting points.
 
 ```{r node-order}
 # build paths and add node order
@@ -600,7 +621,7 @@ For some types of analyses, such as Cormack-Jolly-Seber (CJS) models, one of the
 
 `PITcleanr` contains a function, `filterDetections()`, to help determine which tags/individuals fail to meet the one-way travel assumption and need to be examined further. `filterDetections()` first runs `addDirection()` from above, and then adds two columns, `auto_keep_obs` and `user_keep_obs`. These are meant to indicate whether each row should be kept (i.e. marked TRUE) or deleted (i.e. marked FALSE). For tags that do meet the one-way travel assumption, both auto_keep_obs and user_keep_obs columns will be filled. And if a fish moves back and forth along the same path, `PITcleanr` will indicate that only the last detection at each node should be kept.
 
-If a tag fails to to meet that assumption (e.g. at least one direction is unknown), the `user_keep_obs` column will be NA for all observations of that tag. The `auto_keep_obs` column is `PITcleanr`’s best guess as to which detections should be kept. This guess is based on the assumption that the last and furthest forward-moving detection should be kept, and all detections along that movement path should be kept, while dropping others.
+If a tag fails to to meet that assumption (e.g. at least one direction is unknown), the `user_keep_obs` column will be NA for all observations of that tag. The `auto_keep_obs` column is `PITcleanr`'s best guess as to which detections should be kept. This guess is based on the assumption that the last and furthest forward-moving detection should be kept, and all detections along that movement path should be kept, while dropping others.
 
 ```{r filter-detections}
 # add direction, and filter detections
@@ -622,7 +643,7 @@ comp_filter %>%
 
 The user can then save the output from `filterDetections()`, and fill in all the blanks in the `user_keep_obs` column. The `auto_keep_obs` column is merely a suggestion from `PITcleanr`, the user should use their own knowledge of the landscape, where the detection sites are, the run timing and general spatial patterns of that population to make final decisions. Once all the blank user_keep_obs cells have been filled in, that output can be read back into R and filtered for when `user_keep_obs == TRUE`, and the analysis can proceed from there.
 
-Below, we move forward trusting `PITcleanr`’s algorithm.
+Below, we move forward trusting `PITcleanr`'s algorithm.
 
 ```{r auto-keep}
 # after double-checking PITcleanr calls, filter out the final dataset for further analysis
@@ -639,7 +660,6 @@ node_tags = comp_final %>%
 # view tags per node
 node_tags
 ```
-
 
 ```{r plot-est-tags, eval = FALSE, echo = FALSE}
 # Or you could map the number of tags at each site.
@@ -675,7 +695,7 @@ node_eff
 
 ## Capture Histories
 
-Finally, various mark-recapture models require a capture history of 1’s and 0’s as inputs. `PITcleanr` contains two functions that can help convert tag observations into capture history matrices. `buildCapHist()` uses the compressed observations (whether they’ve been through `filterDections()` or not) and converts them into capture history matrix that can be used in various R survival packages (e.g., Mark). One key will be to ensure the nodes or sites are put in correct order for the user.
+Finally, various mark-recapture models require a capture history of 1's and 0's as inputs. `PITcleanr` contains two functions that can help convert tag observations into capture history matrices. `buildCapHist()` uses the compressed observations (whether they've been through `filterDections()` or not) and converts them into capture history matrix that can be used in various R survival packages (e.g., Mark). One key will be to ensure the nodes or sites are put in correct order for the user.
 
 ```{r cap-hist}
 # build capture histories
@@ -697,14 +717,13 @@ col_nodes <- defineCapHistCols(parent_child = parent_child,
 col_nodes
 ```
 
-
 ```{r rm-objects}
 rm(list = ls())
 ```
 
 # Example: Estimate Lemhi Survival
 
-We start by reading in the detection or capture histories that we’ve queried from PTAGIS.
+We start by reading in the detection or capture histories that we've queried from PTAGIS.
 
 ```{r load-lemhi-data}
 # read in PTAGIS detections
@@ -721,7 +740,7 @@ ptagis_cth <- readCTH(ptagis_file) |>
 #              ignore_event_vs_release = T)
 ```
 
-The configuration file we will use starts with the standard PTAGIS configuration information. For this example we will not concern ourselves with various arrays or antennas at individual sites, but instead we define nodes by their site codes. The first of two exceptions is any sites downstream of Bonneville Dam (river kilometer 234). Because our CJS model will only extend downstream to Bonneville, we will combine all detections below Bonneville with detections at Bonneville, using site B2J. The other exception is to combine the spillway arrays at Lower Granite Dam (site code “GRS”) with other juvenile bypass antennas (“GRJ”) there, because we are not interested in how fish pass Lower Granite dam, only if they do and are detected somewhere while doing so.
+The configuration file we will use starts with the standard PTAGIS configuration information. For this example we will not concern ourselves with various arrays or antennas at individual sites, but instead we define nodes by their site codes. The first of two exceptions is any sites downstream of Bonneville Dam (river kilometer 234). Because our CJS model will only extend downstream to Bonneville, we will combine all detections below Bonneville with detections at Bonneville, using site B2J. The other exception is to combine the spillway arrays at Lower Granite Dam (site code "GRS") with other juvenile bypass antennas ("GRJ") there, because we are not interested in how fish pass Lower Granite dam, only if they do and are detected somewhere while doing so.
 
 ```{r lemhi-config}
 configuration <-
@@ -738,6 +757,7 @@ configuration <-
 ```
 
 ## Compress
+
 With the capture histories and a configuration file that shows what node each detection is mapped onto, we can compress those capture histories into a more manageable and meaningful object. For more detail about compressing, see the [Compressing](https://kevinsee.github.io/PITcleanr/articles/compress_data.html) data vignette.
 
 ```{r config-2, echo=FALSE, eval = FALSE}
@@ -747,7 +767,6 @@ With the capture histories and a configuration file that shows what node each de
 ##                           mustWork = TRUE) |>
 ##   readr::read_csv(show_col_types = F)
 ```
-
 
 ```{r lemhi-compress}
 # compress detections
@@ -788,7 +807,7 @@ sites_sf <-
 sites_sf
 ```
 
-There are a few screwtraps on the mainstem Salmon River or in a tributary to the Salmon that we are not interested in using. We can filter those by only keeping site from Lower Granite downstream, or sites within the Lemhi basin. Some of these sites are on tributaries of the Lemhi River, and we are not interested in keeping those sites (since we don’t anticipate every fish necessarily moving past those sites)
+There are a few screwtraps on the mainstem Salmon River or in a tributary to the Salmon that we are not interested in using. We can filter those by only keeping site from Lower Granite downstream, or sites within the Lemhi basin. Some of these sites are on tributaries of the Lemhi River, and we are not interested in keeping those sites (since we don't anticipate every fish necessarily moving past those sites)
 
 ```{r filter-lemhi-sites}
 sites_sf <-
@@ -899,16 +918,16 @@ In this analysis, we are also only concerned with tag movements after the fish h
 
 `PITcleanr` can perform multiple steps under a single wrapper function, `prepWrapper()`. `prepWrapper` can:
 
-* start with a compressed detection file (`compress_obs`), OR
-* start with the raw complete tag history (`cth_file`) and then compress them.
-* filter out detections prior to a user-defined minimum date (`min_obs_date)` OR
-* filter out detections prior to a user-defined starting node (`start_node`)
-* add direction of movement to each detection (requires `parent_child`)
-* note which tags have detections that follow one-way movements, and which tags do not
-    * and suggest which detections to keep and which to filter out if needed,
-    * including detections that occur after a user-defined maximum date (`max_obs_date`)
-* add a column showing all the nodes where a tag was detected if that would be helpful to the user (`add_tag_detects`; uses the `extractTagObs` function from `PITcleanr`)
-* save the output as an .xlsx or .csv file for the user to peruse with Excel or a similar program (`save_file = TRUE` and `file_name` can be set).
+-   start with a compressed detection file (`compress_obs`), OR
+-   start with the raw complete tag history (`cth_file`) and then compress them.
+-   filter out detections prior to a user-defined minimum date (`min_obs_date)` OR
+-   filter out detections prior to a user-defined starting node (`start_node`)
+-   add direction of movement to each detection (requires `parent_child`)
+-   note which tags have detections that follow one-way movements, and which tags do not
+    -   and suggest which detections to keep and which to filter out if needed,
+    -   including detections that occur after a user-defined maximum date (`max_obs_date`)
+-   add a column showing all the nodes where a tag was detected if that would be helpful to the user (`add_tag_detects`; uses the `extractTagObs` function from `PITcleanr`)
+-   save the output as an .xlsx or .csv file for the user to peruse with Excel or a similar program (`save_file = TRUE` and `file_name` can be set).
 
 For our purposes, we will use the compressed detections and the parent-child table we built previously, filter for detections prior to LEMTRP and add all of the tag detections.
 
@@ -993,11 +1012,11 @@ prepped_df |>
 
 ## Fit a Cormack-Jolly-Seber Model
 
-Now that we’ve wrangled all our detections into capture histories, we’re finally ready to fit a Cormack-Jolly-Seber (CJS) model. There are many options for doing this, but in this example, we’ll use the R package `marked`. Note that fitting a model like this (or nearly any kind of model) is outside the scope of the `PITcleanr` package. `PITcleanr` will help the user wrangle their data into a format that can be utilized in further analyses.
+Now that we've wrangled all our detections into capture histories, we're finally ready to fit a Cormack-Jolly-Seber (CJS) model. There are many options for doing this, but in this example, we'll use the R package `marked`. Note that fitting a model like this (or nearly any kind of model) is outside the scope of the `PITcleanr` package. `PITcleanr` will help the user wrangle their data into a format that can be utilized in further analyses.
 
-Please note that this vignette does not cover any of the details or assumptions behind a CJS model. Before attempting any analysis, the user should be aware of what’s involved and how to interpret the results.
+Please note that this vignette does not cover any of the details or assumptions behind a CJS model. Before attempting any analysis, the user should be aware of what's involved and how to interpret the results.
 
-The `marked` package requires the capture histories to be processed and design data created. Setting the formula for `Phi` (survival parameters) and `p` (detection parameters) to be `~ time` ensures that a separate survival and detection parameter will be estimated between and for each site. For further information about using the `marked` package, please see the package’s [CRAN site](https://cran.r-project.org/web/packages/marked/index.html), the package [vignette](https://cran.r-project.org/web/packages/marked/vignettes/markedVignette.html), or the paper describing it ([Laake, Johnson and Conn (2013)](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.12065)).
+The `marked` package requires the capture histories to be processed and design data created. Setting the formula for `Phi` (survival parameters) and `p` (detection parameters) to be `~ time` ensures that a separate survival and detection parameter will be estimated between and for each site. For further information about using the `marked` package, please see the package's [CRAN site](https://cran.r-project.org/web/packages/marked/index.html), the package [vignette](https://cran.r-project.org/web/packages/marked/vignettes/markedVignette.html), or the paper describing it ([Laake, Johnson and Conn (2013)](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.12065)).
 
 ```{r fit-cjs-mod, results = "hide"}
 # load needed package
@@ -1093,7 +1112,7 @@ est_preds$p |>
                 bootstrap_options = "striped")
 ```
 
-In this example, a user might be interested in the cummulative survival of fish from the Upper Lemhi screw trap to certain dams like Lower Granite, McNary, and John Day. These can be obtained by multiplying survival estimates up to the location of interest. Because the final survival and detection probabilties are confounded in this type of CJS model, we can’t estimate cummulative survival to Bonneville dam (B2J) unless we added detection sites either within the estuary or of adults returning to Bonneville.
+In this example, a user might be interested in the cummulative survival of fish from the Upper Lemhi screw trap to certain dams like Lower Granite, McNary, and John Day. These can be obtained by multiplying survival estimates up to the location of interest. Because the final survival and detection probabilties are confounded in this type of CJS model, we can't estimate cummulative survival to Bonneville dam (B2J) unless we added detection sites either within the estuary or of adults returning to Bonneville.
 
 ```{r cum-surv}
 # cumulative survival to Lower Granite, McNary and John Day dams
