@@ -1,0 +1,86 @@
+a, a > code {
+  color: #0B0B3B;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.footnote {
+  position: absolute;
+  bottom: 3em;
+  padding-right: 4em;
+  font-size: 60%;
+}
+
+.remark-code-line-highlighted     { background-color: #ffd12e ; }
+
+.remark-slide-content {
+  border-top: 8px solid #007b55;
+  border-bottom: 8px solid #007b55;
+  border-right: 11px solid #007b55;
+  border-left: 11px solid #007b55;
+  padding: 1em 2em 1em 2em
+}
+
+.remark-slide-content > h1 {
+  font-weight: normal;
+  margin-top: 10px;
+  margin-left: -00px;
+}
+
+.title-slide{
+  background-image: url(images/wdfwlogo_clr.png);
+  background-position: 3% 95%;
+  background-size: 15%;
+  padding-right: 10px;
+}
+
+.title-slide .remark-slide-number{
+  display: none;
+}
+
+h1, h2, h3 {
+  font-weight: normal;
+  color: #0f426b;
+}
+
+.inverse {
+  background-color: #92d2d8;
+  color: #0f426b;
+  text-shadow: 0 0 0px #333;
+}
+
+.inverse h1, .inverse h2, .inverse h3 {
+  color: #0f426b;
+  font-weight: normal;
+}
+
+table {
+  margin: auto;
+  font-size: 90%;
+  border-top: 1px solid #666;
+  border-bottom: 1px solid #666;
+}
+
+.xlarge{
+  font-size: 200%;
+}
+
+
+.large{
+  font-size: 130%;
+}
+
+.small{
+  font-size: 80%;
+}
+
+.tiny{
+  font-size: 60%;
+}
+
+.bold-italic{
+  font-weight: bold;
+  font-style: italic;
+  font-size: 3em;
+  color: #ffd12e;
+}

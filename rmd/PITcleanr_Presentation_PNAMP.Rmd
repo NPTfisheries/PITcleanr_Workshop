@@ -1,0 +1,911 @@
+---
+title: "Wrangling and Preparing PIT Tag Data using PITcleanr"
+author: Kevin See
+institute: "WDFW <br/> Department of Fish Science <br/>"
+date: "May 8, 2025"
+# output:
+#   xaringan::moon_reader:
+#     css: [default, default-fonts, "ninjutsu", "css/my-theme.css"]
+#     # seal: false
+#     nature:
+#       titleSlideClass: ["left", "middle", "my-title", "inverse"]
+#       highlightStyle: github
+#       highlightLines: true
+#       countIncrementalSlides: false
+#       # ratio: '16:9'
+output:
+  xaringan::moon_reader:
+    # css: ["default", "custom.css"]
+    # css: [default, rladies]
+    css: ["default", "metropolis-fonts", "pnamp_custom.css"]
+    # lib_dir: libs
+    nature:
+      ratio: '16:9'
+      # highlightStyle: dracula
+      # highlightStyle: sunburst
+      highlightStyle: magula
+      # hightlightStyle: github
+      highlightLines: true
+      slideNumberFormat: '%current%'
+      countIncrementalSlides: false
+---
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE)
+
+library(tidyverse)
+library(PITcleanr)
+library(sf)
+library(knitr)
+library(kableExtra)
+library(here)
+# library(boot)
+# library(FSA)
+# library(lubridate)
+# library(ggpubr)
+
+theme_set(theme_bw())
+
+knitr::opts_chunk$set(warning = F, message = F)
+```
+
+background-image: url(images/Chinook_spawner.jpeg)
+background-size: cover
+
+---
+
+background-image: url('images/pit_tag_antenna.jpg'), url('images/logo.png')
+background-position: top 10% right 10%, bottom 10% right 10%
+background-size: 25%, 25%
+
+# Today's Journey
+
+* Benefits and challenges of PIT tag data
+
+* PITcleanr: <p>https://github.com/kevinsee/PITcleanr/</p>
+
+  * Purpose
+
+  * Functionality
+
+  * Package resources
+
+* Summary
+
+---
+
+class: inverse, center, middle
+
+# PIT Tag Data
+
+---
+
+background-image: url('images/PITarray_flow.jpg')
+background-size: cover
+
+---
+
+class: top
+
+# PIT Tag Data
+
+.pull-left[
+### Benefits
+
+Information about individual fish
+
+* movement
+
+* timing
+
+* survival
+
+<center>
+```{r, echo = F, out.width='80%'}
+include_graphics(here("rmd",
+                      "images",
+                      "BiomarkFeatureSalmon.jpg"), dpi = NA)
+```
+</center>
+
+]
+
+.pull-right[
+### Challenges
+
+* **TONS** of data
+
+* Can be overwhelming
+
+* E.g. One juvenile fish detected ***681*** times at single site within 12 hour period on Lemhi River 
+
+<center>
+```{r array-flow, echo = F, out.width='80%'}
+include_graphics(here("rmd",
+                      "images",
+                      "PITarray_flow.jpg"), dpi = NA)
+```
+</center>
+
+]
+
+---
+
+# So much data...
+
+```{r cth}
+# the complete tag history file from PTAGIS
+ptagis_file <- 
+  system.file("extdata", 
+              "TUM_chnk_cth_2018.csv", 
+              package = "PITcleanr")
+
+# read the complete tag history file into R
+observations <- 
+  readCTH(ptagis_file,
+          file_type = "PTAGIS")
+
+n_distinct(observations$tag_code) # unique tag codes
+
+n_distinct(observations$event_site_code_value) # unique event sites
+
+nrow(observations) # total observations
+
+```
+
+```{r, eval = F, echo = F}
+observations |> 
+  group_by(tag_code) |> 
+  summarize(n_det = n()) |> 
+  ungroup() |> 
+  ggplot(aes(x = n_det)) +
+  geom_histogram(fill = "blue") +
+  scale_x_continuous(trans = "log",
+                     breaks = c(2, 5, 10, 30, 50, 100, 300)) +
+  labs(x = "Number of Detections",
+       y = "Count")
+```
+
+
+---
+
+# So much data...
+
+.tiny[
+```{r obs-table, echo=FALSE, message=FALSE}
+observations |> 
+  arrange(tag_code,
+          event_date_time_value,
+          antenna_id) |> 
+  slice(1:100) |> 
+  janitor::clean_names("title") |> 
+  DT::datatable(filter = 'top',
+                options = list(
+                  scrollX = TRUE,
+                  scrollY = 300,
+                  paging = FALSE))
+```
+]
+
+---
+
+class: center, middle
+
+```{r snake-map, echo = F, out.width="60%"}
+include_graphics(here("rmd",
+                      "images",
+                      "snake_site_map.png"), dpi = NA)
+```
+
+
+---
+
+class: inverse, center, middle
+
+# PITcleanr Package
+
+---
+# PITcleanr Purpose
+
+## Make your life easier
+
+.pull-left[
+* Query some data from PTAGIS
+  * Metadata about sites
+  * Configuration files
+  * MRR files
+
+* Read in data from PTAGIS or non-PTAGIS sources
+  * Consistent format
+  * Identify orphan or disowned tags
+]
+
+.pull-right[
+* Compress observations
+  * Reduce redundant detections
+
+* Determine movement direction
+  * Based on parent-child table
+  * Includes tools to build parent-child table
+
+* Estimate array/site efficiency  
+
+* Build capture history matrix
+]
+
+---
+
+class: inverse, center, middle
+
+# PITcleanr Queries
+
+---
+.pull-left[
+# PTAGIS
+
+### Site Metadata
+
+* `queryPtagisMeta()` - Metadata for all PTAGIS sites
+  * `queryInterrogationMeta()`
+  * `queryInterrogationConfig()`
+  * `queryMRRMeta()`
+
+### Tag Details
+
+* `queryMRRDataFile()`
+* *`queryTimerTagSite()`* - can be slow
+* *`queryCapHist()`* - requires API key
+* *`queryTagEvents()`* - requires API key
+]
+
+.pull-right[
+# Non-PTAGIS
+
+### NHDPlus Flowlines
+
+* `queryFlowlines()`
+  * uses `nhdplusTools` package from USGS
+
+]
+
+---
+
+class: inverse, center, middle
+
+# Example Data
+
+---
+
+```{r, echo = F}
+# set the root site
+root_site = c("TUM",
+              "PRA",
+              "PRO",
+              "GRA",
+              "LEMTRP")[1]
+
+all_data_files <- 
+  list.files(system.file("extdata", package = 'PITcleanr'), recursive = T, full.names = T)
+
+cth_file_nm <-
+  all_data_files[str_detect(all_data_files, root_site) & str_detect(all_data_files, "cth")] |> 
+  str_split("/") |> 
+  pluck(1) %>% 
+  pluck(length(.))
+
+```
+
+
+.pull-left[
+
+# Adult Spring Chinook
+
+* Tagged at Tumwater Dam on Wenatchee River as adults
+
+* Goal is to estimate movement or survival past each site
+
+]
+
+.pull-right[
+```{r, echo = F, out.width='70%'}
+include_graphics(here("rmd",
+                      "images",
+                      paste0(root_site, '_site_map.png')), dpi = NA)
+```
+]
+
+---
+
+# Read in Data
+
+Download complete tag histories from PTAGIS as csv file
+
+* Start with a list of tags
+* Need certain columns
+  * Tag, Event Site Code, Event Date Time, Antenna, Antenna Group Configuration
+
+```{r}
+print(cth_file_nm)
+```
+
+--
+
+Use `readCTH()` function:
+
+```{r}
+# read the complete tag history file into R
+cth_df <- 
+  system.file("extdata", 
+              cth_file_nm, 
+              package = "PITcleanr") |> 
+  readCTH(file_type = "PTAGIS")   #<<
+```
+
+* PTAGIS not the only format
+  * Biologic
+  * Raw .log, .xlsx, or .txt files
+* Change `file_type`
+
+---
+
+# Compress data
+
+### Key feature of PITcleanr
+
+Map each site / antenna to a user-defined *node*
+
+Start with:
+* `r prettyNum(nrow(cth_df), big.mark = ",")` observations of 
+* `r prettyNum(n_distinct(cth_df$tag_code), big.mark = ",")` unique tags from 
+* `r prettyNum(n_distinct(cth_df$event_site_code_value), big.mark = ",")` different sites. 
+
+```{r}
+comp_obs <- compress(cth_df)
+```
+
+End with `r prettyNum(nrow(comp_obs), big.mark = ",")` rows of data. 
+* `r round(nrow(comp_obs) / nrow(cth_df) * 100, 1)`% of original data
+
+---
+
+# Compress data
+
+.small[
+```{r comp-table, echo=FALSE, message=FALSE}
+comp_obs |> 
+  mutate(across(where(is.difftime),
+                ~ round(., 1))) |> 
+  slice(1:100) |> 
+  janitor::clean_names("title") |> 
+  DT::datatable(filter = 'top',
+                options = list(
+                  scrollX = TRUE,
+                  scrollY = 300,
+                  paging = FALSE))
+```
+]
+
+---
+
+# Compress data
+
+.large[
+1. Shrink size of data
+
+1. Assign observations to node of your choice
+
+1. First, last and number of detections on each node
+
+1. Total duration between first and last detections
+
+1. Travel time from previous node
+]
+
+---
+
+class: inverse, center, middle
+
+# Configuration File
+
+---
+
+# Configuration file
+
+Map each detection to a user-defined node
+
+Node could be:
+* Individual antenna
+* Array (group of antennas)
+* Site
+* Group of sites
+
+--
+
+Can use PTAGIS site metadata to construct
+
+```{r, cache=T}
+my_config <- 
+  buildConfig(node_assign = "site")   #<<
+```
+
+---
+
+# Configuration file
+
+Essential columns
+
+.small[
+```{r config-table, echo=FALSE, message=FALSE}
+my_config |> 
+  # filter(site_code %in% unique(observations$event_site_code_value)) |> 
+  select(site_code,
+         antenna_id,
+         config_id,
+         node) |> 
+  slice(1:200) |>
+  janitor::clean_names("title") |> 
+  DT::datatable(filter = 'top',
+                options = list(
+                  scrollX = TRUE,
+                  scrollY = 300,
+                  paging = FALSE))
+```
+]
+
+---
+
+# Configuration file
+
+But PTAGIS columns include:
+
+```{r}
+names(my_config) |> 
+  janitor::make_clean_names("title")
+ 
+```
+
+---
+
+class: inverse, center, middle
+
+# Directionality
+
+---
+
+```{r, echo = F, eval = F}
+# load sites, flowlines, parent-child and configuration tables
+system.file("extdata", 
+            paste0(root_site, "_site_config.Rdata"), 
+            package = "PITcleanr") |> 
+  load()
+```
+
+
+.pull-left[
+
+# Map of Sites
+
+* Which sites are upstream / downstream of one another?
+* What are possible paths a fish might take? 
+]
+
+.pull-right[
+```{r, echo = F, out.width='70%'}
+include_graphics(here("rmd",
+                      "images",
+                      paste0(root_site, '_site_map.png')), dpi = NA)
+```
+]
+
+---
+
+# Parent-Child Table
+
+.pull-left[
+
+* Moving upstream, tags move from parent sites to child sites
+
+* Details which sites are upstream of a particular site
+
+* Can be reversed for downstream movement
+
+* Can be made by hand...
+
+* `PITcleanr` has tools to help
+]
+
+.pull-right[
+
+```{r echo = F}
+parent_child <-
+  system.file("extdata", 
+            paste0(root_site, "_parent_child.csv"), 
+            package = "PITcleanr") |> 
+  read_csv()
+```
+
+
+```{r}
+parent_child |> 
+  select(parent, child)
+```
+
+]
+
+???
+Fairly simple example
+
+Easy enough to enter by hand directly into R, or type up in Excel
+
+Can get much more complicated
+
+---
+
+# Parent-Child Table
+
+* PITcleanr has a `buildParentChild()` function.
+
+* Requires an `sf` point object of sites
+  * Build yourself or use `extractSites()`
+
+* Requires an `sf` line object of the NHDPlus flowlines, downloaded from USGS.
+  * Use `queryFlowlines()` to download it
+
+---
+
+# Build `sf` object of sites
+
+### One way
+
+```{r, eval = F}
+# extract sites from detection file
+sites_sf <-
+  extractSites(cth_file = cth_df,   #<<
+               as_sf = T,
+               # drop juvenile detection/marking sites
+               min_date = "20180501")
+
+# focus on sites within Wenatchee subbasin, and drop a few sites we don't care about
+sites_sf <- 
+  sites_sf %>%
+  # all sites in the Wenatchee have a river kilometer that starts with 754
+  filter(str_detect(rkm, "^754."),
+         type != "MRR",
+         site_code != "LWE") |> 
+  mutate(across(site_code,
+                ~ recode(.,
+                         "TUF" = "TUM")))
+```
+
+---
+
+# Build `sf` object of sites
+
+### Another way
+
+```{r, eval = T}
+# type site codes by hand
+sites_sf <-
+  tibble(site_code = 
+           c("ICL", "TUM", "ICM", "UWE", "CHL", "PES", "NAL", 
+             "LNF", "CHW", "ICU", "LWN", "WTL", "CHU", "PEU", 
+             "NAU")) |> 
+  left_join(my_config |> 
+              select(site_code,
+                     site_name,
+                     site_type_name,
+                     site_type,
+                     rkm,
+                     site_description,
+                     latitude,
+                     longitude) |> 
+              distinct(),
+            by = join_by(site_code)) |> 
+  st_as_sf(coords = c("longitude",
+                      "latitude"),
+           crs = 4326) |> 
+  arrange(rkm)
+
+```
+
+---
+
+# Query Flowlines
+
+.pull-left[
+
+```{r, eval = T}
+# query the flowlines
+nhd_list <-
+  queryFlowlines(sites_sf = sites_sf,   #<<
+                 root_site_code = "TUM",
+                 min_strm_order = 2)
+
+# extract flowlines from nhd_list object
+flowlines <-
+  nhd_list$flowlines
+```
+
+]
+
+.pull-right[
+
+```{r}
+flowlines |> 
+  st_drop_geometry() |> 
+  select(comid,
+         hydroseq,
+         uphydroseq,
+         dnhydroseq)
+```
+
+]
+
+---
+
+# Build Parent-Child Table
+
+.pull-left[
+
+```{r, eval = F}
+parent_child <-
+  suppressWarnings(
+    buildParentChild(sites_sf,   #<<
+                     flowlines))
+```
+
+```{r, eval = F}
+parent_child <-
+  editParentChild(parent_child,   #<<
+                  fix_list = 
+                    list(c(NA, "PES", "TUM"),
+                         c(NA, "LNF", "ICL"),
+                         c(NA, "ICL", "TUM"),
+                         c("PES", "ICL", "TUM")),
+                  switch_parent_child = 
+                    list(c("ICL", 'TUM')))
+```
+
+]
+
+.pull-right[
+
+```{r}
+# view corrected parent_child table
+parent_child |> 
+  select(parent, child)
+```
+
+]
+
+---
+
+# Plot Parent-Child Table
+
+.pull-left[
+
+```{r, fig.height = 4}
+plotNodes(parent_child,   #<<
+          point_size = 10,
+          label_size = 5)
+```
+
+]
+
+.pull-right[
+
+All possible fish pathways
+
+```{r}
+buildNodeOrder(parent_child)   #<<
+```
+
+]
+
+---
+
+# Add Direction
+
+```{r}
+comp_dir <-
+  addDirection(compress_obs = comp_obs,   #<<
+               parent_child = parent_child)
+
+comp_dir |> 
+  select(tag_code,
+         node,
+         min_det,
+         node_order,
+         path,
+         direction)
+```
+
+---
+
+# Strange Directions
+
+```{r, echo = F, fig.height = 4}
+plotNodes(parent_child,
+          point_size = 10,
+          label_size = 5)
+```
+
+```{r, echo = F}
+examp_tag <-
+  comp_dir |> 
+  filter(direction %in% "unknown") |> 
+  slice(1) |> 
+  pull(tag_code) |> 
+  unique()
+
+comp_dir |> 
+  filter(tag_code %in% examp_tag) |> 
+  select(tag_code,
+         node,
+         min_det,
+         node_order,
+         path,
+         direction)
+```
+
+---
+
+# Filter Observations
+
+```{r}
+comp_filter <- 
+  filterDetections(compress_obs = comp_obs,   #<<
+                   parent_child = parent_child,
+                   max_obs_date = "20180930")
+
+comp_filter |> 
+  filter(tag_code %in% examp_tag) |> 
+  select(tag_code, node, min_det, direction,
+         path,
+         ends_with("keep_obs"))
+```
+
+???
+`auto_keep_obs` are the default options
+
+user can overwrite with user_keep_obs
+
+---
+
+class: inverse, center, middle
+
+# Other Functionality
+
+
+---
+
+# Array Efficiency
+
+Based on tags detected at an array, and any tags detected upstream of that array
+
+--
+
+Start by building a description of how each node is connected to others
+
+```{r}
+node_order <-
+  buildNodeOrder(parent_child)
+
+node_order
+```
+
+
+---
+
+# Array Efficiency
+
+Based on tags detected at an array, and any tags detected upstream of that array
+
+```{r eval = F}
+estNodeEff(comp_obs,   #<<
+           node_order)
+```
+
+
+```{r echo = F}
+estNodeEff(comp_obs,
+           node_order) |> 
+  mutate(across(starts_with("eff_"),
+                ~ round(., digits = 3))) |> 
+  arrange(eff_est) |> 
+  DT::datatable(filter = 'top',
+                options = list(
+                  scrollX = TRUE,
+                  scrollY = 250,
+                  paging = FALSE))
+```
+
+---
+
+# Capture Histories
+
+.pull-left[
+
+### May need matrix of 1s and 0s
+
+```{r}
+buildCapHist(comp_filter,   #<<
+             parent_child = parent_child,
+             configuration = my_config)
+```
+]
+--
+
+.pull-right[
+
+*What do columns stand for?*
+
+```{r}
+defineCapHistCols(parent_child = parent_child,   #<<
+                  configuration = my_config) |> 
+  as_tibble()
+```
+]
+
+
+---
+
+class: inverse, center, middle
+
+# Package Resources
+
+---
+
+# Package Website
+
+* https://kevinsee.github.io/PITcleanr/
+
+<center>
+```{r, echo = F, out.width='75%'}
+include_graphics(here("rmd",
+                      "images",
+                      "website_screenshot.png"), dpi = NA)
+```
+</center>
+
+
+---
+
+# Package Website
+
+* https://kevinsee.github.io/PITcleanr/
+
+<center>
+```{r, echo = F, out.width='75%'}
+include_graphics(here("rmd",
+                      "images",
+                      "vignettes_screenshot.png"), dpi = NA)
+```
+</center>
+
+---
+
+# Contact Developers
+
+* **Kevin See**: Kevin.See@dfw.wa.gov
+
+* **Mike Ackerman**: MikeA@nezperce.org
+
+* **Ryan Kinzer**: RyanK@nezperce.org
+
+
+--
+
+## Come to workshop this afternoon
+
+
+---
+
+class: center, middle
+
+background-image: url(images/sunrise.jpg)
+background-size: cover
+
+.bold-italic[
+Questions?
+]
