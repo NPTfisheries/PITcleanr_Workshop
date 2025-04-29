@@ -210,6 +210,8 @@ class: inverse, center, middle
 ## Make your life easier
 
 .pull-left[
+* Uses `r include_graphics(here("rmd", "images", "Rlogo.png"), dpi = 2500)`
+
 * Query some data from PTAGIS
   * Metadata about sites
   * Configuration files
@@ -303,6 +305,8 @@ cth_file_nm <-
 * Tagged at Tumwater Dam on Wenatchee River as adults
 
 * Goal is to estimate movement or survival past each site
+  * Abundance estimates
+  * Accounts for imperfect detection efficiency
 
 ]
 
@@ -313,6 +317,25 @@ include_graphics(here("rmd",
                       paste0(root_site, '_site_map.png')), dpi = NA)
 ```
 ]
+
+---
+
+# Read in Data
+
+Download complete tag histories from PTAGIS as csv file
+
+* Start with a list of tags
+* Need certain columns
+  * Tag, Event Site Code, Event Date Time, Antenna, Antenna Group Configuration
+
+<center>
+```{r, echo = F, out.width='65%'}
+include_graphics(here("rmd",
+                      "images",
+                      "ptagis_query.png"), 
+                 dpi = NA)
+```
+</center>
 
 ---
 
@@ -892,11 +915,6 @@ include_graphics(here("rmd",
 * **Mike Ackerman**: MikeA@nezperce.org
 
 * **Ryan Kinzer**: RyanK@nezperce.org
-
-
---
-
-## Come to workshop this afternoon
 
 
 ---
