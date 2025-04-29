@@ -83,6 +83,13 @@ class: inverse, center, middle
 background-image: url('images/PITarray_flow.jpg')
 background-size: cover
 
+???
+Considered a "site"
+
+6 different antennas
+
+Configured into 2 "arrays"
+
 ---
 
 class: top
@@ -197,6 +204,10 @@ include_graphics(here("rmd",
                       "snake_site_map.png"), dpi = NA)
 ```
 
+???
+PITcleanr origin story
+
+Trying to ingest data at this scale, how can we simplify it?
 
 ---
 
@@ -336,6 +347,15 @@ include_graphics(here("rmd",
                  dpi = NA)
 ```
 </center>
+
+???
+Screenshot of PTAGIS complete tag history query
+
+Nicole showed us this a few weeks ago
+
+Can add any other output you might like
+
+Can save in My Reports - upload new tag list
 
 ---
 
@@ -486,6 +506,13 @@ names(my_config) |>
   janitor::make_clean_names("title")
  
 ```
+
+???
+This default is often only the start
+
+Can modify within R, or by downloading and modify by hand in Excel
+
+Or build one yourself in Excel and read it into R: need essential columns
 
 ---
 
@@ -789,9 +816,11 @@ comp_filter |>
 ```
 
 ???
-`auto_keep_obs` are the default options
+straightforward tags will have `auto_keep_obs` and `user_keep_obs` filled in
 
-user can overwrite with user_keep_obs
+`auto_keep_obs` are the default suggestions by PITcleanr
+
+user can overwrite with `user_keep_obs`
 
 ---
 
@@ -817,7 +846,6 @@ node_order <-
 node_order
 ```
 
-
 ---
 
 # Array Efficiency
@@ -842,6 +870,9 @@ estNodeEff(comp_obs,
                   scrollY = 250,
                   paging = FALSE))
 ```
+
+???
+Essentially uses a simple mark-recapture estimate of tags at each array
 
 ---
 
@@ -870,6 +901,8 @@ defineCapHistCols(parent_child = parent_child,   #<<
 ```
 ]
 
+???
+Can add any other covariates you have to each tag (e.g. length, time of tagging, etc.)
 
 ---
 
